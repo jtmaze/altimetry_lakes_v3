@@ -56,10 +56,16 @@ pld = pd.concat(pld_data)
 del gdf, pld_data
 
 # %% 3. Clip the pld data
+
     
 for roi in rois:
     
-    clipped_lakes = gpd.overlay(pld, roi, how='intersection')
+    roi_geom = roi.geometry.iloc[0]
+    fully_within = pld[pld.geometry.apply(lambda geom: geom.within(roi_geom))]
+
+    # Perform the intersection with only the fully contained geometries
+    if not fully_within.empty:
+        clipped_lakes = gpd.overlay(fully_within, roi, how='intersection')
     
     pattern = r'(.*?)_weekly'
     clipped_lakes['roi_name'] = clipped_lakes['roi'].apply(
@@ -81,7 +87,7 @@ for roi in rois:
     clipped_lakes = clipped_lakes.to_crs(est_crs_utm)
     clipped_lakes['area_m2'] = clipped_lakes.geometry.area
     clipped_lakes['perim_m'] = clipped_lakes.geometry.length
-    clipped_lakes['pa_ratio'] = clipped_lakes.area_m2 / clipped_lakes.perim_m2
+    clipped_lakes['pa_ratio'] = clipped_lakes.perim_m / clipped_lakes.area_m2
     clipped_lakes = clipped_lakes.to_crs('EPSG:4326')
     
     out_path = f'{path_pld_out}/{roi_name}_pld_clipped.shp'
