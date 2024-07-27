@@ -14,7 +14,7 @@ import rasterio
 
 from rasterio import features
 
-os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v2')
+os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
 rois_path = './inputs/study_regions.shp'
 rois_list = gpd.read_file(rois_path).name.to_list()

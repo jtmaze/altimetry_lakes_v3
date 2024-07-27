@@ -54,8 +54,6 @@ for roi_name in rois_list:
     pts_df = pd.read_csv(file)
     lakes_file = f'{clipped_lakes_path}/{roi_name}_pld_clipped.shp'
     clipped_lakes = gpd.read_file(lakes_file)
-    clipped_lakes['perim_m'] = clipped_lakes['perim_m2']
-    clipped_lakes = clipped_lakes.drop(columns=['perim_m2'])
     
     pts_df['obs_datetime'] = pd.to_datetime(pts_df['obs_date'])
     pts_df['obs_month'] = pts_df['obs_datetime'].dt.month
