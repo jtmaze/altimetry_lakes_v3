@@ -37,45 +37,45 @@ rois = extract_unique(full_file_list, rois_pattern)
 occurance_cnts = extract_unique(full_file_list, occurance_cnts_pattern)
 timeperiods = extract_unique(full_file_list, weeks_pattern)
 
-# %% 
+# %% Merge the split sentinel-2 masks for each roi at conncurrent timeperiods and thresholds. 
 
 for roi in rois:
+    for timeperiod in timeperiods:
+        for cnt in occurance_cnts:
     
-    jun_files = glob.glob(os.path.join(bad_gee_dir, f'*jun_{roi}*.tif'))
-    aug_files = glob.glob(os.path.join(bad_gee_dir, f'*aug_{roi}*.tif'))
-    
-    months = [jun_files, aug_files]
-    month_names = ['jun', 'aug']
-    
-    for month, month_name in zip(months, month_names):
+                files = glob.glob(os.path.join(split_sentinel2_dir, 
+                                               f'{roi}_weekly_{cnt}_years2019-2023_weeks{timeperiod}*.tif'
+                                               )
+                                  )
+                
+                src_files = []
+                
+                for path in files:
+                    src = rasterio.open(path)
+                    #print(src.meta)
+                    src_files.append(src)
         
-        src_files = []
+                merged, out_transform = merge(src_files)
+                print(len(src_files))
         
-        for path in month:
-            
-            src = rasterio.open(path)
-            src_files.append(src)
-            
-        merged, out_transform = merge(src_files)
+                out_meta = src_files[0].meta.copy()
         
-        out_meta = src_files[0].meta.copy()
-        
-        out_meta.update({
-            "driver": "GTiff",
-            "height": merged.shape[1],
-            "width": merged.shape[2],
-            "transform": out_transform,
-            "crs": src_files[0].crs
-        })
-        
-        out_path = os.path.join(gee_dir, f'Monthly_Recurrence_{month_name}_{roi}.tif')
-    
-        with rasterio.open(out_path, 'w', **out_meta) as dst:
-            dst.write(merged)
-        
-        for src in src_files:
-            src.close()
-        
-        print(f'{roi} {month_name} merged')
+                out_meta.update({
+                    "driver": "GTiff",
+                    "height": merged.shape[1],
+                    "width": merged.shape[2],
+                    "transform": out_transform,
+                    "crs": src_files[0].crs
+                })
 
-print("All processing complete.")
+        
+                out_path = os.path.join(output_sentinel2_dir, 
+                                        f'Recurrence_{roi}_weeks{timeperiod}_{cnt}.tif'
+                                        )
+        
+                with rasterio.open(out_path, 'w', **out_meta) as dst:
+                    dst.write(merged)
+            
+                for src in src_files:
+                    src.close()
+            
