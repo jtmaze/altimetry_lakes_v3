@@ -37,7 +37,7 @@ rois = extract_unique(full_file_list, rois_pattern)
 occurance_cnts = extract_unique(full_file_list, occurance_cnts_pattern)
 timeperiods = extract_unique(full_file_list, weeks_pattern)
 
-# %% Merge the split sentinel-2 masks for each roi at conncurrent timeperiods and thresholds. 
+# %% 2.0 Merge the split sentinel-2 masks for each roi at conncurrent timeperiods and thresholds. 
 
 for roi in rois:
     for timeperiod in timeperiods:
@@ -51,6 +51,7 @@ for roi in rois:
                 src_files = []
                 
                 for path in files:
+                    print(path)
                     src = rasterio.open(path)
                     #print(src.meta)
                     src_files.append(src)
