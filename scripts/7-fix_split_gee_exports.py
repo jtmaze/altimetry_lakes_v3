@@ -53,28 +53,30 @@ for roi in rois:
                                   )
                 
                 src_files = []
+                rescaled_data = []
+                out_transform = None
                 
                 for path in files:
-                    #print(path)
-                    src = rio.open(path)
-                    print(src.meta)
-                    src_files.append(src)
+                    with rio.open(path) as src:
+                        data = src.read(1)
+                        rescaled = (data * 100).round().astype(rio.uint8)
+                        rescaled_data.append(rescaled)
+                        if out_transform is None:
+                            out_transform = src.transform
         
-                merged, out_transform = merge(src_files)
-                print(len(src_files))
+                merged, out_transform = merge(rescaled_data, transform=out_transform)
+                print(len(rescaled_data))
         
-                out_meta = src_files[0].meta.copy()
+                out_meta = src.meta.copy()
         
                 out_meta.update({
                     "driver": "GTiff",
                     "height": merged.shape[1],
                     "width": merged.shape[2],
                     "transform": out_transform,
-                    "crs": src_files[0].crs,
+                    "crs": src.crs,
                     "dtype": 'uint8'
                 })
-
-                scaled_merged = (merged * 100).round().astype(rio.uint8)
 
         
                 out_path = os.path.join(output_sentinel2_dir, 
@@ -82,10 +84,7 @@ for roi in rois:
                                         )
         
                 with rio.open(out_path, 'w', **out_meta) as dst:
-                    dst.write(scaled_merged)
-            
-                for src in src_files:
-                    src.close()
+                    dst.write(merged)
             
 
 # %%
