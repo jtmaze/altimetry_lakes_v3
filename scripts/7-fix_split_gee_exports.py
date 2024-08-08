@@ -11,7 +11,7 @@ Created on Sat Jun 22 09:12:16 2024
 import os
 import re
 import glob
-import rasterio
+import rasterio as rio
 from rasterio.merge import merge
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
@@ -20,8 +20,8 @@ output_sentinel2_dir = './data/sentinel2_clean/'
 
 full_file_list = glob.glob(split_sentinel2_dir + '*')
 
-rois_pattern = r'/sentinel2_raw/(.*?)_weekly.*\.tif'
-occurance_cnts_pattern = r'_weekly_(.*?)_years.*\.tif'
+rois_pattern = r'/sentinel2_raw/(.*?)_yea.*\.tif'
+years_pattern = r'_years(.*?)_wee.*\.tif'
 weeks_pattern = r'_weeks(.*?)-0000.*\.tif'
 
 def extract_unique(files, pattern):
@@ -34,26 +34,30 @@ def extract_unique(files, pattern):
 
 
 rois = extract_unique(full_file_list, rois_pattern)
-occurance_cnts = extract_unique(full_file_list, occurance_cnts_pattern)
-timeperiods = extract_unique(full_file_list, weeks_pattern)
+year_intervals = extract_unique(full_file_list, years_pattern)
+week_intervals = extract_unique(full_file_list, weeks_pattern)
 
-# %% 2.0 Merge the split sentinel-2 masks for each roi at conncurrent timeperiods and thresholds. 
+# %% 2.0 Reformat the sentinel-2 masks
+"""
+The sentinel-2 masks are split into multiple files. We need to merge them into a single file.
+Also, we need to scale the values to 0-100, and convert the data type to uint8 for memory efficiency.
+"""
 
 for roi in rois:
-    for timeperiod in timeperiods:
-        for cnt in occurance_cnts:
+    for week_interval in week_intervals:
+        for year_interval in year_intervals:
     
                 files = glob.glob(os.path.join(split_sentinel2_dir, 
-                                               f'{roi}_weekly_{cnt}_years2019-2023_weeks{timeperiod}*.tif'
+                                               f'{roi}_years{year_interval}_weeks{week_interval}*.tif'
                                                )
                                   )
                 
                 src_files = []
                 
                 for path in files:
-                    print(path)
-                    src = rasterio.open(path)
-                    #print(src.meta)
+                    #print(path)
+                    src = rio.open(path)
+                    print(src.meta)
                     src_files.append(src)
         
                 merged, out_transform = merge(src_files)
@@ -66,17 +70,22 @@ for roi in rois:
                     "height": merged.shape[1],
                     "width": merged.shape[2],
                     "transform": out_transform,
-                    "crs": src_files[0].crs
+                    "crs": src_files[0].crs,
+                    "dtype": 'uint8'
                 })
+
+                scaled_merged = (merged * 100).round().astype(rio.uint8)
 
         
                 out_path = os.path.join(output_sentinel2_dir, 
-                                        f'Recurrence_{roi}_weeks{timeperiod}_{cnt}.tif'
+                                        f'Recurrence_{roi}__years{year_interval}_weeks{week_interval}.tif'
                                         )
         
-                with rasterio.open(out_path, 'w', **out_meta) as dst:
-                    dst.write(merged)
+                with rio.open(out_path, 'w', **out_meta) as dst:
+                    dst.write(scaled_merged)
             
                 for src in src_files:
                     src.close()
             
+
+# %%

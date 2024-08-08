@@ -25,6 +25,7 @@ path_pld_out = './data/pld_clipped/'
 roi_files = glob.glob(f'{path_rois}/*.shp')
 rois = []
 
+
 for roi_file in roi_files:
     roi = gpd.read_file(roi_file)
     rois.append(roi)
@@ -67,10 +68,8 @@ for roi in rois:
     if not fully_within.empty:
         clipped_lakes = gpd.overlay(fully_within, roi, how='intersection')
     
-    pattern = r'(.*?)_weekly'
-    clipped_lakes['roi_name'] = clipped_lakes['roi'].apply(
-        lambda x: re.search(pattern, x).group(1)
-    )
+    
+    clipped_lakes['roi_name'] = clipped_lakes['roi']
     clipped_lakes = clipped_lakes.drop(columns=['roi'])
     
     # Convert the lake_id to a string for more robust dataset
@@ -104,3 +103,5 @@ for roi in rois:
     
 
 
+
+# %%
