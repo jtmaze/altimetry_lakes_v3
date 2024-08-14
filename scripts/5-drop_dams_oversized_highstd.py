@@ -23,7 +23,7 @@ matched_lakes = matched_lakes.to_crs(proj_crs)
 geodar = gpd.read_file('./data/geodar/GeoDAR_v11_dams.shp')
 geodar = geodar.to_crs(proj_crs)
 
-# %% 3. Apply buffer to GeoDAR
+# %% 3. Apply 1000m buffer to GeoDAR
 
 buffer_dist = 1000 #meters
 
@@ -77,15 +77,6 @@ cols = no_dams_clean.columns
 drop_cols = cols[cols != 'lake_id']
 clean_ids = no_dams_clean.drop(columns=drop_cols)
 clean_ids.to_csv('./data/clean_ids.csv')
-
-
-
-
-
-
-
-
-
 
 
 # %%

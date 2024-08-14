@@ -21,7 +21,7 @@ output_sentinel2_dir = './data/sentinel2_clean/'
 
 full_file_list = glob.glob(split_sentinel2_dir + '*')
 
-rois_pattern = r'/sentinel2_raw/(.*?)_yea.*\.tif'
+rois_pattern = r'/sentinel2_raw/v2_(.*?)_yea.*\.tif'
 years_pattern = r'_years(.*?)_wee.*\.tif'
 weeks_pattern = r'_weeks(.*?)-0000.*\.tif'
 
@@ -48,7 +48,7 @@ for roi in rois:
         for year_interval in year_intervals:
     
                 files = glob.glob(os.path.join(split_sentinel2_dir, 
-                                               f'{roi}_years{year_interval}_weeks{week_interval}*.tif'
+                                               f'v2_{roi}_years{year_interval}_weeks{week_interval}*.tif'
                                                )
                                   )
                 
@@ -74,7 +74,7 @@ for roi in rois:
 
 
                 out_path = os.path.join(output_sentinel2_dir, 
-                                        f'Recurrence_{roi}__years{year_interval}_weeks{week_interval}.tif'
+                                        f'Recurrence_{roi}_years{year_interval}_weeks{week_interval}.tif'
                                         )
         
                 with rio.open(out_path, 'w', **out_meta) as dst:
