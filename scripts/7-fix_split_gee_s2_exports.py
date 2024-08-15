@@ -17,7 +17,7 @@ from rasterio.merge import merge
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 split_sentinel2_dir = './data/sentinel2_raw/'
-output_sentinel2_dir = './data/sentinel2_clean/'
+output_sentinel2_dir = './data/recurrence_clean/'
 
 full_file_list = glob.glob(split_sentinel2_dir + '*')
 
@@ -38,7 +38,7 @@ rois = extract_unique(full_file_list, rois_pattern)
 year_intervals = extract_unique(full_file_list, years_pattern)
 week_intervals = extract_unique(full_file_list, weeks_pattern)
 
-# %% 2.0 Reformat the sentinel-2 masks
+# %% 2.0 Reformat the sentinel-2 occurrences
 """
 The sentinel-2 masks are split into multiple files. We need to merge them into a single file.
 """
@@ -69,12 +69,14 @@ for roi in rois:
                     "height": merged.shape[1],
                     "width": merged.shape[2],
                     "transform": out_transform,
+                    "dtype": 'uint8',
                     "crs": src_files[0].crs
                 })
 
+                print(f'OUT META: {out_meta}')
 
                 out_path = os.path.join(output_sentinel2_dir, 
-                                        f'Recurrence_{roi}_years{year_interval}_weeks{week_interval}.tif'
+                                        f'Recurrence_{roi}_timeframe_years{year_interval}_weeks{week_interval}_dataset_sentinel2.tif'
                                         )
         
                 with rio.open(out_path, 'w', **out_meta) as dst:

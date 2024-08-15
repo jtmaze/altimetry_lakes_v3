@@ -17,7 +17,7 @@ from rasterio.merge import merge
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 split_gswo_dir = './data/gswo_raw/'
-output_gswo_dir = './data/gswo_clean/'
+output_gswo_dir = './data/recurrence_clean/'
 
 full_file_list = glob.glob(split_gswo_dir + '*')
 
@@ -37,7 +37,7 @@ rois = extract_unique(full_file_list, rois_pattern)
 months = extract_unique(full_file_list, months_pattern)
 
 
-# %% 2.0 Reformat the sentinel-2 masks
+# %% 2.0 Reformat the gswo occurrences
 """
 The gswo masks are split into multiple files. We need to merge them into a single file.
 """
@@ -74,7 +74,7 @@ for roi in rois:
         print(f'OUT META: {out_meta}')
 
         out_path = os.path.join(output_gswo_dir, 
-                                f'GSWORecurrence_{roi}_months_{month}_.tif'
+                                f'Recurrence_{roi}_timeframe_{month}_dataset_gswo.tif'
                                 )
 
         with rio.open(out_path, 'w', **out_meta) as dst:
