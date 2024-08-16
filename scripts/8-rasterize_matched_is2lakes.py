@@ -35,8 +35,8 @@ buffer_ref.to_csv('./data/buffer_bands.csv', index=False)
 # %% 3.0 Apply buffers and rasterize lakes in each ROI.
 
 """
-To rasterize the buffered lakes, we copy metadata from the Sentinel-2 rasters.
-If rasterizing the GSWO lakes, we copy metadata from the GSWO raster.
+We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have different
+resolutions. Need to run this script twice, chaning the dataset (GSWO or Sentinel-2).
 """
 dataset = 'sentinel2'
 
@@ -45,18 +45,18 @@ for roi_name in rois_list:
     # Read the raster files associated with the ROI
     roi_matched = clean_lakes[clean_lakes['roi_name'] == roi_name]
     # !!! Change path to match GSWO or Sentinel-2 data
-    recurrence_path = f'./data/{dataset}_clean/Recurrence_{roi_name}_years*.tif'
+    recurrence_path = f'./data/recurrence_clean/Recurrence_{roi_name}_*_dataset_{dataset}.tif'
     matched_reccurence = glob.glob(recurrence_path) 
     # There will be multiple matches, but they all have the same metadata
     matched_reccurence_first = matched_reccurence[0]
     recurrence_raster = rasterio.open(matched_reccurence_first)
+    print(f'RECURRENCE RASTER: {recurrence_raster.meta}')
     
     # Reproject ROI to local utm for buffering
     roi_utm = roi_matched.copy()
     est_crs = roi_utm.estimate_utm_crs(datum_name='WGS 84')
     print(f'{roi_name} with {est_crs} estimated UTM')
     roi_utm = roi_utm.to_crs(est_crs)
-    
 
     # Apply buffer values & rasterize lake geoms
     buffered_layers = []
@@ -68,9 +68,8 @@ for roi_name in rois_list:
         roi_buffered[buff_col] = roi_utm.geometry.buffer(buffer_val)
         roi_buffered = roi_buffered.set_geometry(buff_col)
         
-        # Convert back to GSWO CRS
+        # Convert back to recurrence CRS
         roi_buffered = roi_buffered.to_crs(recurrence_raster.crs)
-        print(recurrence_raster.crs)
         
         # Rasterize buffered ROI
         roi_rasterized = features.rasterize(
@@ -87,7 +86,7 @@ for roi_name in rois_list:
         
         
     # Write to memory
-    out_path = f'./data/lake_summaries/{roi_name}_rasterized_buffers.tif'
+    out_path = f'./data/lake_summaries/{dataset}_{roi_name}_rasterized_buffers.tif'
     
     with rasterio.open(
             out_path,
@@ -103,7 +102,7 @@ for roi_name in rois_list:
         for i, layer in enumerate(buffered_layers, start=1):
             dst.write(layer, i)
             
-    print(dst.meta)
+    print(f'OUT META: {dst.meta}')
     
 
 # %%
