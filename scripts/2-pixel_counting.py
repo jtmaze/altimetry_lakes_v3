@@ -45,7 +45,7 @@ def mask_over_matched_lakes(dataset, timeframe, roi_name, band, buffer_val):
 
     if not os.path.exists(path_recurrence_raster):
         print(f"Skipping {path_recurrence_raster} because it does not exist.")
-        return None, None
+        return None, None, None, None, None
 
     with rio.open(path_lakes) as mask:
         mask_data = mask.read([band])
@@ -57,14 +57,21 @@ def mask_over_matched_lakes(dataset, timeframe, roi_name, band, buffer_val):
         target_data = target.read(1)
         target_meta = target.meta
         print(f'TARGET META: {target_meta}')
-    
-    mask_bool = mask_data != 0
-    matched_data = np.where(mask_bool, target_data, 0)
-    matched_data = np.squeeze(matched_data)
+
+    if dataset == 'gswo':
+        mask_bool = mask_data != 0
+        matched_data = np.where(mask_bool, target_data, 0)
+        matched_data_squeeze = np.squeeze(matched_data)
+
+    elif dataset == 'sentinel2':
+        #target_data = target_data.squeeze()
+        mask_bool = mask_data != 0
+        matched_data = np.where(mask_bool, target_data, 0)
+        matched_data_squeeze = np.squeeze(matched_data)
 
     print(f'{roi_name} {matched_data.shape}')
             
-    return matched_data, target_meta
+    return matched_data_squeeze, target_meta, mask_bool, target_data, matched_data
 
 
 # %% test
@@ -78,8 +85,9 @@ for roi in rois:
         for timeframe in timeframes:
             for buffer_val in buffer_vals:
 
+                print(f'!!! {roi} {timeframe} {buffer_val} {dataset}')
                 band = buffer_ref[buffer_ref['buffer'] == buffer_val]['band'].values[0]
-                matched_data, target_meta = mask_over_matched_lakes(dataset, timeframe, roi, band, buffer_val)
+                matched_data_squeeze, target_meta, mask_bool, target_data, matched_data = mask_over_matched_lakes(dataset, timeframe, roi, band, buffer_val)
 
                 if matched_data is None:
                     continue
@@ -95,10 +103,11 @@ for roi in rois:
 
                 results.append(df)
 
-                print(roi, timeframe, buffer_val, dataset)
+                print(f'!!! {roi} {timeframe} {buffer_val} {dataset}')
 
 full_results = pd.concat(results)
 
+full_results.to_csv('./data/pixel_counts.csv', index=False)
 
 # %% 3.0 Save results
 
