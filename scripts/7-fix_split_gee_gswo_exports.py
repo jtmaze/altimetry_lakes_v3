@@ -11,17 +11,17 @@ Created on Sat Jun 22 09:12:16 2024
 import os
 import re
 import glob
-import numpy as np
+#import numpy as np
 import rasterio as rio
 from rasterio.merge import merge
 
-os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
+os.chdir('/Users/jtmaz/Documents/projects/altimetry_lakes_v3')
 split_gswo_dir = './data/gswo_raw/'
 output_gswo_dir = './data/recurrence_clean/'
 
 full_file_list = glob.glob(split_gswo_dir + '*')
 
-rois_pattern = r'/gswo_raw/GSWORecurrence_(.*?)_month.*\.tif'
+rois_pattern = r'GSWORecurrence_(.*?)_month.*\.tif'
 months_pattern = r'_month_(.*?)_'
 
 def extract_unique(files, pattern):

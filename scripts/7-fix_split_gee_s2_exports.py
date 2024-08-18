@@ -11,17 +11,17 @@ Created on Sat Jun 22 09:12:16 2024
 import os
 import re
 import glob
-import numpy as np
+#import numpy as np
 import rasterio as rio
 from rasterio.merge import merge
 
-os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
+os.chdir('/Users/jtmaz/Documents/projects/altimetry_lakes_v3')
 split_sentinel2_dir = './data/sentinel2_raw/'
 output_sentinel2_dir = './data/recurrence_clean/'
 
 full_file_list = glob.glob(split_sentinel2_dir + '*')
 
-rois_pattern = r'/sentinel2_raw/v2_(.*?)_yea.*\.tif'
+rois_pattern = r'v2_(.*?)_yea.*\.tif'
 years_pattern = r'_years(.*?)_wee.*\.tif'
 weeks_pattern = r'_weeks(.*?)-0000.*\.tif'
 

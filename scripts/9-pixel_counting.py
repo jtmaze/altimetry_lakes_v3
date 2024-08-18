@@ -9,7 +9,7 @@ import numpy as np
 import rasterio as rio
 import re
 
-os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
+os.chdir('/Users/jtmaz/Documents/projects/altimetry_lakes_v3')
 
 buffer_ref = pd.read_csv('./data/buffer_bands.csv')
 rois_list = list(gpd.read_file('./data/lake_summaries/matched_lakes_clean.shp')['roi_name'].unique())
