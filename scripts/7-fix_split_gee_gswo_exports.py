@@ -15,7 +15,7 @@ import glob
 import rasterio as rio
 from rasterio.merge import merge
 
-os.chdir('/Users/jtmaz/Documents/projects/altimetry_lakes_v3')
+os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 split_gswo_dir = './data/gswo_raw/'
 output_gswo_dir = './data/recurrence_clean/'
 
@@ -58,7 +58,7 @@ for roi in rois:
             src_files.append(src)
 
         merged, out_transform = merge(src_files)
-        print(len(src_files))
+        print(f'{len(src_files)} to merge')
 
         out_meta = src_files[0].meta.copy()
 

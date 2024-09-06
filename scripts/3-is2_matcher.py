@@ -63,9 +63,12 @@ for roi_name in rois:
     
     #del(years)
 
-    is2_gdf = gpd.GeoDataFrame(roi_is2_data, geometry=gpd.points_from_xy(roi_is2_data['longitude'],
-                                                                         roi_is2_data['latitude']),
-                               crs='EPSG:4326')
+    is2_gdf = gpd.GeoDataFrame(roi_is2_data, 
+                               geometry=gpd.points_from_xy(roi_is2_data['longitude'],
+                                                           roi_is2_data['latitude']
+                                                           ),
+                               crs='EPSG:4326'
+                               )
     
     #del(roi_is2_data)
     
@@ -77,6 +80,7 @@ for roi_name in rois:
     # Convert to a df for more efficient file storage. 
     is2_matched_df = pd.DataFrame(is2_matched.drop(columns=['geometry', 'index_right']))
     is2_matched_df.to_csv(f'{path_matched_pts}/{roi_name}_matched.csv', index=False)
+    print(f'{roi_name} matched')
     
     #del(roi_name, lake_path, lake_data, lakes_slim, is2_gdf, is2_matched, is2_matched_df)
     
