@@ -15,13 +15,13 @@ import glob
 import rasterio as rio
 from rasterio.merge import merge
 
-os.chdir('/Users/jtmaz/Documents/projects/altimetry_lakes_v3')
+os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 split_sentinel2_dir = './data/sentinel2_raw/'
 output_sentinel2_dir = './data/recurrence_clean/'
 
 full_file_list = glob.glob(split_sentinel2_dir + '*')
 
-rois_pattern = r'v2_(.*?)_yea.*\.tif'
+rois_pattern = r'/*sentinel2_raw/(.*?)_yea.*\.tif'
 years_pattern = r'_years(.*?)_wee.*\.tif'
 weeks_pattern = r'_weeks(.*?)-0000.*\.tif'
 
@@ -48,7 +48,7 @@ for roi in rois:
         for year_interval in year_intervals:
     
                 files = glob.glob(os.path.join(split_sentinel2_dir, 
-                                               f'v2_{roi}_years{year_interval}_weeks{week_interval}*.tif'
+                                               f'{roi}_years{year_interval}_weeks{week_interval}*.tif'
                                                )
                                   )
                 
@@ -58,9 +58,10 @@ for roi in rois:
                     src = rio.open(path)
                     #print(src.meta)
                     src_files.append(src)
+
+                print(f'merging total = {len(src_files)}')
         
                 merged, out_transform = merge(src_files)
-                print(len(src_files))
         
                 out_meta = src_files[0].meta.copy()
         
