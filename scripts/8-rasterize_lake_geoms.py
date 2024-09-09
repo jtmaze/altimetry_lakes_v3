@@ -18,10 +18,27 @@ from rasterio import features
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
-clean_lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
-clean_lakes = gpd.read_file(clean_lakes_path)
+"""
+We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have different
+resolutions. Need to run this script multiple times, changing the dataset (gswo or sentinel2)
+or the scope (all_pld or matched_is2).
+"""
+dataset = 'sentinel2'
+scope = 'matched_is2'
 
-rois_list = clean_lakes['roi_name'].unique().tolist()
+"""This code for matched ICESat-2 lakes"""
+# lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
+# lakes = gpd.read_file(lakes_path)
+
+"""This code for all the clipped PLD lakes"""
+lakes_path = './data/pld_clipped/*.shp'
+pld_files = glob.glob(lakes_path)
+pld_gdfs = [gpd.read_file(file) for file in pld_files]
+lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
+
+rois_list = lakes['roi_name'].unique().tolist()
+rois_remove = ['MRD', 'TUK', 'anderson_plain']
+rois_list = [roi for roi in rois_list if roi not in rois_remove]
 
 # %% 2.0 Choose buffer values to apply to lakes.
 
@@ -33,6 +50,8 @@ buffer_ref = pd.DataFrame(list(buffer_ref.items()), columns=['band', 'buffer'])
 buffer_ref.to_csv('./data/buffer_bands.csv', index=False)
 
 # %% 3.0 Apply buffers and rasterize lakes in each ROI.
+
+# %% 3.1 Define the functions
 
 def read_recurrence_raster(roi_name, dataset):
     """
@@ -77,11 +96,11 @@ def buffer_and_rasterize_lakes(roi_lakes_utm, buffer_val, src_meta):
     print(roi_rasterized.max(), roi_rasterized.min())
     return roi_rasterized
 
-def write_output(dataset, roi_name, buffered_layers, src_meta):
+def write_output(dataset, roi_name, buffered_layers, src_meta, scope):
     """
     Write rasterized layers to a GeoTIFF file.
     """
-    out_path = f'./data/lake_summaries/{dataset}_{roi_name}_rasterized_buffers.tif'
+    out_path = f'./data/lake_summaries/{scope}_scope_{dataset}_{roi_name}_rasterized_buffers.tif'
 
     with rio.open(
         out_path,
@@ -99,7 +118,7 @@ def write_output(dataset, roi_name, buffered_layers, src_meta):
 
     print(f'RASTERIZED OUTPUT META: {dst.meta}')
 
-def rasterize_matched_is2_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals):
+def rasterize_matched_is2_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals, scope):
     """
     Coordinate the rasterization of buffered lake geometries for multiple buffer values.
     """
@@ -111,21 +130,23 @@ def rasterize_matched_is2_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals)
                                                   src_meta=src_meta
                                                   ) for val in buffer_vals]
     
-    write_output(dataset=dataset, roi_name=roi_name, buffered_layers=buffered_layers, src_meta=src_meta)
+    write_output(dataset=dataset, 
+                 roi_name=roi_name, 
+                 buffered_layers=buffered_layers, 
+                 src_meta=src_meta,
+                 scope=scope
+    )
 
     print(f'{roi_name} is rasterized')
 
-"""
-We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have different
-resolutions. Need to run this script twice, changing the dataset (gswo or sentinel2).
-"""
-dataset = 'gswo'
+# %% 3.2 Run the functions
 
 for roi_name in rois_list:
     rasterize_matched_is2_lakes(roi_name, 
                                 dataset=dataset, 
                                 buffer_vals=buffer_vals, 
-                                lakes_clean_gdf=clean_lakes
-                                )
+                                lakes_clean_gdf=lakes,
+                                scope=scope
+    )
 
 # %%

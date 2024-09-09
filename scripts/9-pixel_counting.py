@@ -37,10 +37,14 @@ rois = extract_unique(recurrence_files, roi_pattern)
 
 # %% 3.0 Define functions
 
-def mask_over_matched_lakes(dataset, timeframe, roi_name, band):
+def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
+    """
+    Applies a mask over matched lakes and returns the masked data.
+    """
 
+    print(f'Processing {roi} {timeframe} {buffer_val} {dataset} {scope}')
     path_recurrence_raster = f'./data/recurrence_clean/Recurrence_{roi_name}_timeframe_{timeframe}_dataset_{dataset}.tif'
-    path_lakes = f'./data/lake_summaries/{dataset}_{roi_name}_rasterized_buffers.tif'
+    path_lakes = f'./data/lake_summaries/{scope}_scope_{dataset}_{roi_name}_rasterized_buffers.tif'
 
     # Quick error handling, some combinations will not exist, because the
     # timeframes are named differently between GSWO and Sentinel-2. 
@@ -65,41 +69,51 @@ def mask_over_matched_lakes(dataset, timeframe, roi_name, band):
             
     return matched_data
 
+def create_summary_df(matched_data, roi, timeframe, dataset, scope):
+    """
+    Create a summary DataFrame from the masked data.
+    """
+    flat = matched_data.flatten()
+    unique_vals, cnts = np.unique(flat, return_counts=True)
+    df = pd.DataFrame({'pix_vals': unique_vals, 'pix_cnts': cnts})
+    df['roi_name'] = roi
+    df['timeframe'] = timeframe
+    df['buffer'] = buffer_val
+    df['dataset'] = dataset
+    df['scope'] = scope
+
+    print(f'Finished.')
+
+
 
 # %% test
 
 buffer_vals = [60, 90, 120] # meters
+scopes = ['all_pld', 'matched_is2']
 results = []
 
 for roi in rois:
-    for dataset in datasets:
-        for timeframe in timeframes:
-            for buffer_val in buffer_vals:
+    for scope in scopes:
+        for dataset in datasets:
+            for timeframe in timeframes:
+                for buffer_val in buffer_vals:
 
-                print(f'Processing {roi} {timeframe} {buffer_val} {dataset}')
-                band = buffer_ref[buffer_ref['buffer'] == buffer_val]['band'].values[0]
-                matched_data = mask_over_matched_lakes(dataset, timeframe, roi, band)
+                    band = buffer_ref[buffer_ref['buffer'] == buffer_val]['band'].values[0]
+                    matched_data = mask_over_matched_lakes(scope, dataset, timeframe, roi, band)
 
-                if matched_data is None:
-                    continue
+                    if matched_data is None:
+                        continue
 
-                flat = matched_data.flatten()
-
-                unique_vals, cnts = np.unique(flat, return_counts=True)
-                df = pd.DataFrame({'pix_vals': unique_vals, 'pix_cnts': cnts})
-                df['roi_name'] = roi
-                df['timeframe'] = timeframe
-                df['buffer'] = buffer_val
-                df['dataset'] = dataset
-
-                results.append(df)
-
-                print(f'Finished.')
+                    results.append(create_summary_df(matched_data,
+                                                    roi,
+                                                    timeframe,
+                                                    dataset,
+                                                    scope
+                                                    )
+                                   )
 
 full_results = pd.concat(results)
 
 full_results.to_csv('./data/pixel_counts.csv', index=False)
-
-
 
 # %%
