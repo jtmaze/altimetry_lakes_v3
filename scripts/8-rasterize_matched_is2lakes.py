@@ -12,7 +12,7 @@ import re
 import glob
 import pandas as pd
 import geopandas as gpd
-import rasterio
+import rasterio as rio
 
 from rasterio import features
 
@@ -34,75 +34,98 @@ buffer_ref.to_csv('./data/buffer_bands.csv', index=False)
 
 # %% 3.0 Apply buffers and rasterize lakes in each ROI.
 
-"""
-We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have different
-resolutions. Need to run this script twice, chaning the dataset (GSWO or Sentinel-2).
-"""
-dataset = 'sentinel2'
-
-for roi_name in rois_list:
-
-    # Read the raster files associated with the ROI
-    roi_matched = clean_lakes[clean_lakes['roi_name'] == roi_name]
-    # !!! Change path to match GSWO or Sentinel-2 data
+def read_recurrence_raster(roi_name, dataset):
+    """
+    Read the first matching recurrence raster file based on ROI name and dataset.
+    """
     recurrence_path = f'./data/recurrence_clean/Recurrence_{roi_name}_*_dataset_{dataset}.tif'
     matched_reccurence = glob.glob(recurrence_path) 
-    # There will be multiple matches, but they all have the same metadata
+    # There will be multiple matched files, but they all have the same metadata
     matched_reccurence_first = matched_reccurence[0]
-    recurrence_raster = rasterio.open(matched_reccurence_first)
-    print(f'RECURRENCE RASTER: {recurrence_raster.meta}')
-    
-    # Reproject ROI to local utm for buffering
-    roi_utm = roi_matched.copy()
-    est_crs = roi_utm.estimate_utm_crs(datum_name='WGS 84')
-    print(f'{roi_name} with {est_crs} estimated UTM')
-    roi_utm = roi_utm.to_crs(est_crs)
+    src = rio.open(matched_reccurence_first)
+    print(f'SOURCE RASTER META = {src.meta}')
+    return src.meta 
 
-    # Apply buffer values & rasterize lake geoms
-    buffered_layers = []
-    for buffer_val in buffer_vals:
-        
-        roi_buffered = roi_utm.copy()
-        
-        buff_col = f'geom_buff{buffer_val}'
-        roi_buffered[buff_col] = roi_utm.geometry.buffer(buffer_val)
-        roi_buffered = roi_buffered.set_geometry(buff_col)
-        
-        # Convert back to recurrence CRS
-        roi_buffered = roi_buffered.to_crs(recurrence_raster.crs)
-        
-        # Rasterize buffered ROI
-        roi_rasterized = features.rasterize(
-            roi_buffered[f'geom_buff{buffer_val}'],
-            out_shape=recurrence_raster.shape,
-            fill=0,
-            out=None,
-            transform= recurrence_raster.transform,
-            all_touched=True,
-            default_value=buffer_val
-        )
-        
-        buffered_layers.append(roi_rasterized)
-        
-        
-    # Write to memory
+def read_matched_lake_shapes(roi_name, lakes_clean_gdf):
+    """
+    Filter lakes by ROI name and convert geometries to estimated UTM CRS.
+    """
+    roi_lakes = lakes_clean_gdf[lakes_clean_gdf['roi_name'] == roi_name]
+    est_crs = roi_lakes.estimate_utm_crs(datum_name='WGS 84')
+    roi_lakes_utm = roi_lakes.copy().to_crs(est_crs)
+    return roi_lakes_utm
+
+def buffer_and_rasterize_lakes(roi_lakes_utm, buffer_val, src_meta):
+    """
+    Buffer lake geometries and rasterize them according to source raster metadata.
+    """
+    roi_buffered = roi_lakes_utm.copy()
+    buff_col = f'geom_buff{buffer_val}'
+    roi_buffered = roi_lakes_utm.geometry.buffer(buffer_val)
+    # After buffering, convert out of UTM back to coordinates of source raster
+    roi_buffered = roi_buffered.to_crs(src_meta['crs'])
+
+    roi_rasterized = features.rasterize(
+        roi_buffered,
+        out_shape=(src_meta['height'], src_meta['width']),
+        fill=0,
+        out=None,
+        transform=src_meta['transform'],
+        all_touched=True,
+        default_value=buffer_val
+    )
+    print(roi_rasterized.max(), roi_rasterized.min())
+    return roi_rasterized
+
+def write_output(dataset, roi_name, buffered_layers, src_meta):
+    """
+    Write rasterized layers to a GeoTIFF file.
+    """
     out_path = f'./data/lake_summaries/{dataset}_{roi_name}_rasterized_buffers.tif'
-    
-    with rasterio.open(
-            out_path,
-            'w',
-            driver='GTiff', 
-            height=roi_rasterized.shape[0],
-            width=roi_rasterized.shape[1],
-            count=len(buffer_vals),
-            dtype='uint8',
-            crs=recurrence_raster.crs,
-            transform=recurrence_raster.transform,
+
+    with rio.open(
+        out_path,
+        'w',
+        driver='GTiff',
+        width=src_meta['width'],
+        height=src_meta['height'],
+        count=len(buffer_vals),
+        dtype=src_meta['dtype'],
+        crs=src_meta['crs'],
+        transform=src_meta['transform']
     ) as dst:
         for i, layer in enumerate(buffered_layers, start=1):
             dst.write(layer, i)
-            
-    print(f'OUT META: {dst.meta}')
+
+    print(f'RASTERIZED OUTPUT META: {dst.meta}')
+
+def rasterize_matched_is2_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals):
+    """
+    Coordinate the rasterization of buffered lake geometries for multiple buffer values.
+    """
+    src_meta = read_recurrence_raster(roi_name, dataset)
+    roi_lakes_utm = read_matched_lake_shapes(roi_name, lakes_clean_gdf)
+
+    buffered_layers = [buffer_and_rasterize_lakes(roi_lakes_utm=roi_lakes_utm,
+                                                  buffer_val=val,
+                                                  src_meta=src_meta
+                                                  ) for val in buffer_vals]
     
+    write_output(dataset=dataset, roi_name=roi_name, buffered_layers=buffered_layers, src_meta=src_meta)
+
+    print(f'{roi_name} is rasterized')
+
+"""
+We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have different
+resolutions. Need to run this script twice, changing the dataset (gswo or sentinel2).
+"""
+dataset = 'gswo'
+
+for roi_name in rois_list:
+    rasterize_matched_is2_lakes(roi_name, 
+                                dataset=dataset, 
+                                buffer_vals=buffer_vals, 
+                                lakes_clean_gdf=clean_lakes
+                                )
 
 # %%
