@@ -49,24 +49,35 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
     # timeframes are named differently between GSWO and Sentinel-2. 
 
     if not os.path.exists(path_recurrence_raster) or not os.path.exists(path_lakes):
-        print(f"!!! Skipping {roi_name}, {timeframe}, {dataset} because "
+        print(f"!!! Skipping {roi_name}, {timeframe}, {dataset}, {scope} because "
               "files are missing.")
         return None
 
     with rio.open(path_lakes) as mask:
         mask_data = mask.read([band])
         mask_meta = mask.meta
-        print(mask_meta)
+        #print(mask_meta)
 
 
     with rio.open(path_recurrence_raster) as target:
         target_data = target.read(1)
         target_meta = target.meta
-        print(target_meta)
+        #print(target_meta)
 
     mask_bool = mask_data != 0
-    matched_data = np.where(mask_bool, target_data, 0)
-    matched_data = np.squeeze(matched_data)
+    matched_data = np.where(mask_bool, target_data, -1)
+    matched_data = np.squeeze(matched_data) # Need to squeeze because GSWO datasets have an extra dimension (i.e. L, H, W)
+
+    # output_path = f'./temp/matched_{roi_name}_{timeframe}_{dataset}_band{band}.tif'
+    # with rio.open(output_path, 'w', 
+    #               driver='GTiff',
+    #               height=matched_data.shape[0],
+    #               width=matched_data.shape[1],
+    #               count=1,  
+    #               dtype=matched_data.dtype,
+    #               crs=target_meta['crs'],  
+    #               transform=target_meta['transform']) as dst:
+    #     dst.write(matched_data, 1)  
             
     return matched_data
 
@@ -83,7 +94,7 @@ def create_summary_df(matched_data, roi, timeframe, dataset, scope):
     df['dataset'] = dataset
     df['scope'] = scope
 
-    print(f'Finished.')
+    print(f'Finished with iteration')
 
     return df
 
