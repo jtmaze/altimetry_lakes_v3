@@ -12,7 +12,7 @@ import re
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
 buffer_ref = pd.read_csv('./data/buffer_bands.csv')
-rois_list = list(gpd.read_file('./data/lake_summaries/matched_lakes_clean.shp')['roi_name'].unique())
+#rois_list = list(gpd.read_file('./data/lake_summaries/matched_lakes_clean.shp')['roi_name'].unique())
 
 # %% 2.0 Extract timeframes and rois from recurrence file names
 
@@ -33,7 +33,6 @@ def extract_unique(files, pattern):
 timeframes = extract_unique(recurrence_files, timeframe_pattern)
 datasets = extract_unique(recurrence_files, dataset_pattern)
 rois = extract_unique(recurrence_files, roi_pattern)
-
 
 # %% 3.0 Define functions
 
@@ -57,11 +56,13 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
     with rio.open(path_lakes) as mask:
         mask_data = mask.read([band])
         mask_meta = mask.meta
+        print(mask_meta)
 
 
     with rio.open(path_recurrence_raster) as target:
         target_data = target.read(1)
         target_meta = target.meta
+        print(target_meta)
 
     mask_bool = mask_data != 0
     matched_data = np.where(mask_bool, target_data, 0)
@@ -84,9 +85,11 @@ def create_summary_df(matched_data, roi, timeframe, dataset, scope):
 
     print(f'Finished.')
 
+    return df
 
 
-# %% test
+
+# %% Run the functions
 
 buffer_vals = [60, 90, 120] # meters
 scopes = ['all_pld', 'matched_is2']
@@ -101,16 +104,17 @@ for roi in rois:
                     band = buffer_ref[buffer_ref['buffer'] == buffer_val]['band'].values[0]
                     matched_data = mask_over_matched_lakes(scope, dataset, timeframe, roi, band)
 
-                    if matched_data is None:
-                        continue
+                    if matched_data is not None:
+                        results.append(create_summary_df(matched_data,
+                                                        roi,
+                                                        timeframe,
+                                                        dataset,
+                                                        scope
+                                                        )
+                                    )
 
-                    results.append(create_summary_df(matched_data,
-                                                    roi,
-                                                    timeframe,
-                                                    dataset,
-                                                    scope
-                                                    )
-                                   )
+                    else:
+                        continue
 
 full_results = pd.concat(results)
 
