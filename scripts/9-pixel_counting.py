@@ -79,7 +79,7 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
     #               transform=target_meta['transform']) as dst:
     #     dst.write(matched_data, 1)  
             
-    return matched_data
+    # return matched_data
 
 def create_summary_df(matched_data, roi, timeframe, dataset, scope):
     """
@@ -129,6 +129,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-full_results.to_csv('./data/pixel_counts.csv', index=False)
+full_results.to_csv('./data/pixel_counts_plz_work.csv', index=False)
 
 # %%

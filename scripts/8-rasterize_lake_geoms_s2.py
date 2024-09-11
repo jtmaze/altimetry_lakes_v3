@@ -24,17 +24,18 @@ resolutions. Need to run this script multiple times, changing the dataset (gswo 
 or the scope (all_pld or matched_is2).
 """
 dataset = 'sentinel2'
-scope = 'all_pld'
+scope = 'matched_is2'
 
 """This code for matched ICESat-2 lakes"""
-# lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
-# lakes = gpd.read_file(lakes_path)
+lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
+lakes = gpd.read_file(lakes_path)
 
 """This code for all the clipped PLD lakes"""
-lakes_path = './data/pld_clipped/*.shp'
-pld_files = glob.glob(lakes_path)
-pld_gdfs = [gpd.read_file(file) for file in pld_files]
-lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
+# lakes_path = './data/pld_clipped/*.shp'
+# pld_files = glob.glob(lakes_path)
+# pld_gdfs = [gpd.read_file(file) for file in pld_files]
+# lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
+""" Uncomment it !!! here"""
 
 rois_list = lakes['roi_name'].unique().tolist()
 rois_remove = ['MRD', 'TUK', 'anderson_plain']
