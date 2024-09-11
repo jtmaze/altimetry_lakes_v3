@@ -79,7 +79,7 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
     #               transform=target_meta['transform']) as dst:
     #     dst.write(matched_data, 1)  
             
-    # return matched_data
+    return matched_data
 
 def create_summary_df(matched_data, roi, timeframe, dataset, scope):
     """
@@ -105,6 +105,7 @@ def create_summary_df(matched_data, roi, timeframe, dataset, scope):
 buffer_vals = [60, 90, 120] # meters
 scopes = ['all_pld', 'matched_is2']
 results = []
+timeframes = ['years2016-2023_weeks22-26', 'aug', 'years2016-2023_weeks31-35', 'june']
 
 for roi in rois:
     for scope in scopes:

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
-pixels_summary = pd.read_csv('./data/pixel_counts_test3.csv')
+pixels_summary = pd.read_csv('./data/pixel_counts_plz_work.csv')
 #all_lakes_summary = pd.read_csv('./data/pixel_counts_all_lakes.csv')
 
 is2_path = './data/lake_timeseries/*_timeseries.csv'
@@ -247,55 +247,6 @@ def by_roi_sensitivity_viz(df, roi_name):
 
 for roi_name in roi_names:
     by_roi_sensitivity_viz(seasonal_results, roi_name)
-# %%
-
-# def side_by_side_bar(df, x_var):
-#     # Filter data by dataset
-#     df_matched_sentinel2 = df[(df['scope'] == 'matched_is2') & (df['dataset'] == 'sentinel2')]
-#     ds_matched_sentinel2 = df_matched_sentinel2.groupby(x_var)['seasonality'].mean()
-    
-#     df_pld_sentinel2 = df[(df['scope'] == 'all_pld') & (df['dataset'] == 'sentinel2')]
-#     ds_pld_sentinel2 = df_pld_sentinel2.groupby(x_var)['seasonality'].mean()
-
-#     df_matched_gswo = df[(df['scope'] == 'matched_is2') & (df['dataset'] == 'gswo')]
-#     ds_matched_gswo = df_matched_gswo.groupby(x_var)['seasonality'].mean()
-
-#     df_pld_gswo = df[(df['scope'] == 'all_pld') & (df['dataset'] == 'gswo')]
-#     ds_matched_gswo = df_pld_gswo.groupby(x_var)['seasonality'].mean()
-    
-#     mean_seasonality = dsMatched.add(dsPLD, fill_value=0) / 2
-#     mean_seasonality = mean_seasonality.sort_values(ascending=False)
-
-#     width = 0.35  # Bar width
-#     unique_xvar = mean_seasonality.index.tolist()
-#     ind = np.arange(len(unique_xvar))  # the x locations for the groups
-
-#     fig, ax = plt.subplots(figsize=(14, 4))
-#     # Plotting bars for each dataset
-#     # You need to aggregate or summarize the data if necessary, here assuming sum/mean should be calculated
-#     barsIS2 = ax.bar(ind - width/2, 
-#                      dsMatched.reindex(unique_xvar).fillna(0).values, 
-#                      width, 
-#                      edgecolor='black', 
-#                      label="Matched IS2 Lakes")
-#     barsPLD = ax.bar(ind + width/2, 
-#                      dsPLD.reindex(unique_xvar).fillna(0).values, 
-#                      width, 
-#                      edgecolor='black',
-#                      label="All PLD Lakes")
-
-
-#     # Set x-axis labels and legend
-#     ax.set_xticks(ind)
-#     ax.set_xticklabels(unique_xvar, rotation=90)  # Rotate labels if they are lengthy
-#     ax.set_xlabel(x_var)
-#     ax.set_ylabel('Percent change (of lake mask) early to late summer')
-#     ax.legend()
-
-#     # Display the plot
-#     plt.show()
-    
-#     return unique_xvar
 
 # %% Calculate the ICESat-2 seasonality
 
@@ -317,6 +268,29 @@ is2_seasonality = is2_data_clean.groupby(
         std_zdif = ('zdif_date', 'std'),
         lakes_cnt = ('lake_id', lambda x: len(x.unique().tolist()))
         ).reset_index()
+
+is2_seasonality = is2_seasonality.pivot_table(
+    index = ['roi_name'],
+    columns = ['obs_month'],
+    values = ['mean_zdif', 'std_zdif', 'lakes_cnt']
+    ).reset_index()
+
+is2_seasonality['seasonality'] = is2_seasonality[('mean_zdif', '6')] - is2_seasonality[('mean_zdif', '8')]
+
+columns_to_drop = [
+    ('lakes_cnt', '6'),
+    ('lakes_cnt', '8'),
+    ('mean_zdif', '6'),
+    ('mean_zdif', '8'),
+    ('std_zdif', '6'),
+    ('std_zdif', '8')
+]
+
+is2_seasonality.drop(
+    columns=columns_to_drop,
+    inplace=True)
+
+is2_seasonality.columns = is2_seasonality.columns.droplevel(1)
 
 
 # %% 
@@ -370,13 +344,22 @@ def side_by_side_bar(df, x_var):
     
     # Set x-axis labels and legend
     ax.set_xticks(ind)
-    ax.set_xticklabels(unique_xvar, rotation=90)  # Rotate labels if they are lengthy
+    ax.set_xticklabels(unique_xvar, rotation=0)  # Rotate labels if they are lengthy
     ax.set_xlabel(x_var)
     ax.set_ylabel('Percent change (of lake mask) early to late summer')
     ax.legend()
 
     # Display the plot
     plt.show()
+
+    mean_values = (
+        ds_matched_sentinel2.reindex(unique_xvar).fillna(0) + 
+        ds_pld_sentinel2.reindex(unique_xvar).fillna(0) + 
+        ds_matched_gswo.reindex(unique_xvar).fillna(0) + 
+        ds_pld_gswo.reindex(unique_xvar).fillna(0)
+    ) / 4
+
+    return unique_xvar, mean_values
 
 
 # %%
@@ -396,6 +379,58 @@ df_analyze = df_analyze[
     (df_analyze['buffer'] == 120) & (df_analyze['threshold'] == 78)
 ]
 
-ordered_rois = side_by_side_bar(df_analyze, 'roi_name')
+ordered_rois, mean_values = side_by_side_bar(df_analyze, 'roi_name')
+
+
+is2_seasonality['roi_name'] = pd.Categorical(is2_seasonality['roi_name'],
+                                             categories=ordered_rois,
+                                             ordered=True)
+is2_seasonality = is2_seasonality.sort_values('roi_name')
+
+fig, ax = plt.subplots(figsize=(14, 4))
+bars = plt.bar(is2_seasonality['roi_name'], 
+               is2_seasonality['seasonality'], 
+               color='pink',
+               edgecolor='black')
+ax.set_xticklabels(is2_seasonality['roi_name'], rotation=0)
+
+plt.ylabel('June - August WSE difference (m)')
+
+# %% Rescale like a shithead
+
+#!!! See whether GSWO or Sentinel-2 better agrees with the ICESat-2 Seasonality!!
+is2_rescaled = is2_seasonality.copy()
+is2_rescaled['seasonality'] = is2_seasonality['seasonality'] * 50 
+
+fig, ax = plt.subplots(figsize=(14, 4))
+bars = ax.bar(is2_rescaled['roi_name'], 
+              is2_rescaled['seasonality'], 
+              color='pink', 
+              edgecolor='black', 
+              width=0.4, 
+              label='IS2 Seasonality Rescaled')
+
+# Bar plot for the `mean_values`
+bars_mean = ax.bar(is2_seasonality['roi_name'], 
+                   mean_values.values, 
+                   color='gray', 
+                   edgecolor='black', 
+                   width=0.4, 
+                   label='Mean Across Datasets', 
+                   alpha=0.7, 
+                   align='edge')  # Ensure bars are placed side-by-side
+
+# Customize x-axis
+ax.set_xticks(np.arange(len(is2_seasonality['roi_name'])))
+ax.set_xticklabels(is2_seasonality['roi_name'], rotation=0)
+
+# Labels and legend
+plt.ylabel('Seasonality rescaled for comparison')
+plt.legend()
+
+# Show the plot
+plt.show()
+
+
 
 # %%
