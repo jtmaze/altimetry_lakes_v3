@@ -15,6 +15,7 @@ is2_path = './data/lake_timeseries/*_timeseries.csv'
 is2_files = glob.glob(is2_path)
 is2_dfs = [pd.read_csv(file) for file in is2_files]
 is2_data = pd.concat(is2_dfs)
+is2_rois = is2_data['roi_name'].unique()
 
 del is2_dfs, is2_path
 # %% 2.0 Clean up the pixel counts datasets
@@ -359,10 +360,20 @@ def side_by_side_bar(df, x_var):
         ds_pld_gswo.reindex(unique_xvar).fillna(0)
     ) / 4
 
-    return unique_xvar, mean_values
+    sentinel2_mean = (
+        ds_matched_sentinel2.reindex(unique_xvar).fillna(0) + 
+        ds_pld_sentinel2.reindex(unique_xvar).fillna(0)
+    ) / 2
+
+    gswo_mean = (
+        ds_matched_gswo.reindex(unique_xvar).fillna(0) + 
+        ds_pld_gswo.reindex(unique_xvar).fillna(0)
+    ) / 2
+
+    return unique_xvar, mean_values, sentinel2_mean, gswo_mean
 
 
-# %%
+# %% Create seasonality df based on criteria
 
 df_analyze = seasonal_results.drop(columns=[
         ('total_pix',  'late'),
@@ -376,11 +387,12 @@ df_analyze = seasonal_results.drop(columns=[
 df_analyze.columns = df_analyze.columns.droplevel(1)
 
 df_analyze = df_analyze[
-    (df_analyze['buffer'] == 120) & (df_analyze['threshold'] == 78)
+    (df_analyze['buffer'] == 120) & (df_analyze['threshold'] == 80)
 ]
 
-ordered_rois, mean_values = side_by_side_bar(df_analyze, 'roi_name')
+ordered_rois, all_mean, sentinel2_mean, gswo_mean = side_by_side_bar(df_analyze, 'roi_name')
 
+# %% Visualize just the ICESat-2
 
 is2_seasonality['roi_name'] = pd.Categorical(is2_seasonality['roi_name'],
                                              categories=ordered_rois,
@@ -396,7 +408,7 @@ ax.set_xticklabels(is2_seasonality['roi_name'], rotation=0)
 
 plt.ylabel('June - August WSE difference (m)')
 
-# %% Rescale like a shithead
+# %% Compare seasonality between ICESat-2 and Optical
 
 #!!! See whether GSWO or Sentinel-2 better agrees with the ICESat-2 Seasonality!!
 is2_rescaled = is2_seasonality.copy()
@@ -411,12 +423,12 @@ bars = ax.bar(is2_rescaled['roi_name'],
               label='IS2 Seasonality Rescaled')
 
 # Bar plot for the `mean_values`
-bars_mean = ax.bar(is2_seasonality['roi_name'], 
-                   mean_values.values, 
-                   color='gray', 
+bars_mean = ax.bar(gswo_mean.index, 
+                   gswo_mean.values, 
+                   color='lightgreen', 
                    edgecolor='black', 
                    width=0.4, 
-                   label='Mean Across Datasets', 
+                   label='Mean GSWO Datasets', 
                    alpha=0.7, 
                    align='edge')  # Ensure bars are placed side-by-side
 

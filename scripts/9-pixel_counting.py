@@ -36,12 +36,12 @@ rois = extract_unique(recurrence_files, roi_pattern)
 
 # %% 3.0 Define functions
 
-def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
+def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band, buffer):
     """
     Applies a mask over matched lakes and returns the masked data.
     """
 
-    print(f'Processing {roi} {timeframe} {buffer_val} {dataset} {scope}')
+    print(f'Processing {roi_name} {timeframe} {buffer} {dataset} {scope}')
     path_recurrence_raster = f'./data/recurrence_clean/Recurrence_{roi_name}_timeframe_{timeframe}_dataset_{dataset}.tif'
     path_lakes = f'./data/lake_summaries/{scope}_scope_{dataset}_{roi_name}_rasterized_buffers.tif'
 
@@ -68,16 +68,18 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band):
     matched_data = np.where(mask_bool, target_data, -1)
     matched_data = np.squeeze(matched_data) # Need to squeeze because GSWO datasets have an extra dimension (i.e. L, H, W)
 
-    # output_path = f'./temp/matched_{roi_name}_{timeframe}_{dataset}_band{band}.tif'
-    # with rio.open(output_path, 'w', 
-    #               driver='GTiff',
-    #               height=matched_data.shape[0],
-    #               width=matched_data.shape[1],
-    #               count=1,  
-    #               dtype=matched_data.dtype,
-    #               crs=target_meta['crs'],  
-    #               transform=target_meta['transform']) as dst:
-    #     dst.write(matched_data, 1)  
+    if (buffer == 120) and (roi_name in ['ACKP', 'YKdelta', 'YKflats', 'MRD_TUK_Anderson']):
+        
+        output_path = f'./data/masked_rasters/scope_{scope}__roi_{roi_name}__timeframe_{timeframe}__dataset_{dataset}__buffer{buffer}.tif'
+        with rio.open(output_path, 'w', 
+                      driver='GTiff',
+                      height=matched_data.shape[0],
+                      width=matched_data.shape[1],
+                      count=1,  
+                      dtype=matched_data.dtype,
+                      crs=target_meta['crs'],  
+                      transform=target_meta['transform']) as dst:
+            dst.write(matched_data, 1)  
             
     return matched_data
 
@@ -114,7 +116,7 @@ for roi in rois:
                 for buffer_val in buffer_vals:
 
                     band = buffer_ref[buffer_ref['buffer'] == buffer_val]['band'].values[0]
-                    matched_data = mask_over_matched_lakes(scope, dataset, timeframe, roi, band)
+                    matched_data = mask_over_matched_lakes(scope, dataset, timeframe, roi, band, buffer_val)
 
                     if matched_data is not None:
                         results.append(create_summary_df(matched_data,
@@ -130,6 +132,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-full_results.to_csv('./data/pixel_counts_plz_work.csv', index=False)
+full_results.to_csv('./data/pixel_counts_it_works.csv', index=False)
 
 # %%
