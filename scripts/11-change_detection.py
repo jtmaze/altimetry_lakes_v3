@@ -99,7 +99,8 @@ def change_by_water_mask(
         with rio.open(src_early_path) as src_early, rio.open(src_late_path) as src_late:
             data_early = rxr.open_rasterio(src_early_path, chunks='auto').astype('int8')
             data_late = rxr.open_rasterio(src_late_path, chunks='auto').astype('int8')
-
+            data_early_crs = data_early.rio.crs
+            print(data_early_crs)
             lake_mask_early = xr.where(data_early >= threshold, 1, 0)
             lake_mask_late = xr.where(data_late >= threshold, 1, 0)
             na_mask = (data_early == -1) | (data_late == -1)
@@ -115,6 +116,8 @@ def change_by_water_mask(
             change_classified = xr.where((lake_mask_early == 0) & (lake_mask_late == 0), 4, change_classified) # 4 = land, no change
             change_classified = change_classified.where(~na_mask)
 
+            change_classified.rio.write_crs(data_early_crs, inplace=True)
+
             del lake_mask_early, lake_mask_late, na_mask
 
             output_path = f'./data/change_maps/MaskChange__{roi}__{dataset}__{scope}__change__{timeframe1}_to_{timeframe2}_buffer{buffer}.tif'
@@ -124,9 +127,7 @@ def change_by_water_mask(
 
 # %% 
 
-raster_change_dict_f = dict(list(raster_change_dict.items())[10:])
-
-for key, rasters in raster_change_dict_f.items():
+for key, rasters in raster_change_dict.items():
     scope, roi, dataset, buffer = key
     # Sort rasters into proper order before change detection
     if dataset == 'gswo':        
