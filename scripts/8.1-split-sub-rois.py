@@ -23,7 +23,7 @@ all_timeseries = pd.read_csv('./data/lake_timeseries/MRD_TUK_Anderson_timeseries
 for name, gdf in sub_rois_dict.items():
     clipped_lakes = gpd.clip(all_gdf, gdf)
     clipped_lakes['roi_name'] = name
-    clipped_lakes.to_csv(f'./data/lake_summaries/{name}_lakesummary.csv')
+    clipped_lakes.to_csv(f'./data/lake_summaries/{name}_lakesummary.csv', index=False)
 
     geoms_with_ids = clipped_lakes[['lake_id', 'geometry']]
     clipped_timeseries = pd.merge(
@@ -34,7 +34,7 @@ for name, gdf in sub_rois_dict.items():
     )
     clipped_timeseries['roi_name'] = name
 
-    clipped_timeseries.to_csv(f'./data/lake_timeseries/{name}_timeseries.csv')
+    clipped_timeseries.to_csv(f'./data/lake_timeseries/{name}_timeseries.csv', index=False)
     print(f'{name} lake shapes and timeseries clipped')
 
 # %% Function to search file paths with regex pattern

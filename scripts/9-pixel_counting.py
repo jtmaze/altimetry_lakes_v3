@@ -68,7 +68,7 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band, buffer):
     matched_data = np.where(mask_bool, target_data, -1)
     matched_data = np.squeeze(matched_data) # Need to squeeze because GSWO datasets have an extra dimension (i.e. L, H, W)
 
-    if (buffer == 120) and (roi_name in ['ACKP', 'YKdelta', 'YKflats', 'MRD_TUK_Anderson']):
+    if (buffer == 120) and (roi_name in ['AKCP', 'YKdelta', 'YKflats', 'MRD_TUK_Anderson']):
         
         output_path = f'./data/masked_rasters/scope_{scope}__roi_{roi_name}__timeframe_{timeframe}__dataset_{dataset}__buffer{buffer}.tif'
         with rio.open(output_path, 'w', 
@@ -108,6 +108,7 @@ buffer_vals = [60, 90, 120] # meters
 scopes = ['all_pld', 'matched_is2']
 results = []
 timeframes = ['years2016-2023_weeks22-26', 'aug', 'years2016-2023_weeks31-35', 'june']
+rois = ['AKCP']
 
 for roi in rois:
     for scope in scopes:
@@ -132,6 +133,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-full_results.to_csv('./data/pixel_counts_it_works.csv', index=False)
+#full_results.to_csv('./data/pixel_counts_it_works.csv', index=False)
 
 # %%
