@@ -18,6 +18,8 @@ is2_data = pd.concat(is2_dfs)
 is2_rois = is2_data['roi_name'].unique()
 
 del is2_dfs, is2_path
+# %%
+
 # %% 2.0 Clean up the pixel counts datasets
 
 # !!! A few pixels were oddly above the max value of 100, no clue why this happened.
@@ -370,7 +372,7 @@ def side_by_side_bar(df, x_var):
         ds_pld_gswo.reindex(unique_xvar).fillna(0)
     ) / 2
 
-    return unique_xvar, mean_values, sentinel2_mean, gswo_mean
+    return unique_xvar, mean_values, sentinel2_mean, gswo_mean, ds_matched_sentinel2, ds_matched_gswo
 
 
 # %% Create seasonality df based on criteria
@@ -390,9 +392,9 @@ df_analyze = df_analyze[
     (df_analyze['buffer'] == 120) & (df_analyze['threshold'] == 80)
 ]
 
-ordered_rois, all_mean, sentinel2_mean, gswo_mean = side_by_side_bar(df_analyze, 'roi_name')
+ordered_rois, all_mean, sentinel2_mean, gswo_mean, matched_sentinel2, matched_gswo = side_by_side_bar(df_analyze, 'roi_name')
 
-# %% Visualize just the ICESat-2
+# %% Visualize just the ICESat-2 WSE (m) seasonality
 
 is2_seasonality['roi_name'] = pd.Categorical(is2_seasonality['roi_name'],
                                              categories=ordered_rois,
@@ -407,42 +409,72 @@ bars = plt.bar(is2_seasonality['roi_name'],
 ax.set_xticklabels(is2_seasonality['roi_name'], rotation=0)
 
 plt.ylabel('June - August WSE difference (m)')
-
-# %% Compare seasonality between ICESat-2 and Optical
-
-#!!! See whether GSWO or Sentinel-2 better agrees with the ICESat-2 Seasonality!!
-is2_rescaled = is2_seasonality.copy()
-is2_rescaled['seasonality'] = is2_seasonality['seasonality'] * 50 
-
-fig, ax = plt.subplots(figsize=(14, 4))
-bars = ax.bar(is2_rescaled['roi_name'], 
-              is2_rescaled['seasonality'], 
-              color='pink', 
-              edgecolor='black', 
-              width=0.4, 
-              label='IS2 Seasonality Rescaled')
-
-# Bar plot for the `mean_values`
-bars_mean = ax.bar(gswo_mean.index, 
-                   gswo_mean.values, 
-                   color='lightgreen', 
-                   edgecolor='black', 
-                   width=0.4, 
-                   label='Mean GSWO Datasets', 
-                   alpha=0.7, 
-                   align='edge')  # Ensure bars are placed side-by-side
-
-# Customize x-axis
-ax.set_xticks(np.arange(len(is2_seasonality['roi_name'])))
-ax.set_xticklabels(is2_seasonality['roi_name'], rotation=0)
-
-# Labels and legend
-plt.ylabel('Seasonality rescaled for comparison')
-plt.legend()
-
-# Show the plot
 plt.show()
 
+# %% Compare mean of all optical datasets with ICESat-2
+is2_rescaled = is2_seasonality.copy()
+max_optical = all_mean.values.max()
+rescale_factor = max_optical / is2_rescaled['seasonality'].max()
+is2_rescaled['seasonality_rescaled'] = is2_rescaled['seasonality'] * rescale_factor
 
+x = np.arange(len(is2_rescaled['roi_name']))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(14, 4))
+
+bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
+bars_mean = ax.bar(x + width/2, all_mean.values, width, label='Mean of all Optical Datasets', color='grey', edgecolor='black', alpha=0.7)
+
+ax.set_xticks(x)
+ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
+
+ax.set_ylabel('Seasonality Rescaled for Comparison')
+ax.legend()
+
+plt.show()
+
+# %% Compare the matched Sentinel-2 lakes and ICESat-2
+is2_rescaled = is2_seasonality.copy()
+max_optical = matched_sentinel2.values.max()
+rescale_factor = max_optical / is2_rescaled['seasonality'].max()
+is2_rescaled['seasonality_rescaled'] = is2_rescaled['seasonality'] * rescale_factor
+
+fig, ax = plt.subplots(figsize=(14, 4))
+
+x = np.arange(len(is2_rescaled['roi_name']))
+width = 0.35
+
+bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
+bars_mean = ax.bar(x + width/2, matched_sentinel2.values, width, label='Sentinel-2 with matched subset', color='blue', edgecolor='black', alpha=0.7)
+
+ax.set_xticks(x)
+ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
+
+ax.set_ylabel('Seasonality Rescaled for Comparison')
+ax.legend()
+
+plt.show()
+
+# %% Compare the matched GSWO lakes and ICESat-2
+is2_rescaled = is2_seasonality.copy()
+max_optical = matched_gswo.values.max()
+rescale_factor = max_optical / is2_rescaled['seasonality'].max()
+is2_rescaled['seasonality_rescaled'] = is2_rescaled['seasonality'] * rescale_factor
+
+fig, ax = plt.subplots(figsize=(14, 4))
+
+x = np.arange(len(is2_rescaled['roi_name']))
+width = 0.35
+
+bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
+bars_mean = ax.bar(x + width/2, matched_gswo.values, width, label='Sentinel-2 with matched subset', color='green', edgecolor='black', alpha=0.7)
+
+ax.set_xticks(x)
+ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
+
+ax.set_ylabel('Seasonality Rescaled for Comparison')
+ax.legend()
+
+plt.show()
 
 # %%
