@@ -1,4 +1,4 @@
-# %% Libraries and directories
+# %% 1.0 Libraries and directories
 
 import os
 import glob
@@ -6,6 +6,7 @@ import re
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import matplotlib.pyplot as plt
 
 import rasterio as rio
 from rasterio.features import rasterize
@@ -17,6 +18,8 @@ from skimage.measure import label, regionprops_table
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
+# %% 1.1 Load ICESat-2 data
+
 is2_lakes = gpd.read_file('./data/lake_summaries/matched_lakes_clean.shp')
 # The roi_name columnn doesn't sub-dived MRD, TUK and Anderson
 is2_lakes.drop(columns=['roi_name'], inplace=True)
@@ -25,17 +28,26 @@ is2_timeseries = [pd.read_csv(p) for p in is2_timeseries_paths]
 is2_timeseries = pd.concat(is2_timeseries)
 is2_timeseries.drop(columns=['Unnamed: 0', 'geometry'], inplace=True)
 
-# %% Generate list of lakes with observations high enough for regression analysis
+lake_ids_clean_path = './data/clean_ids.csv'
+lake_ids_clean = pd.read_csv(lake_ids_clean_path)['lake_id']
 
+is2_lakes = is2_lakes[is2_lakes['lake_id'].isin(lake_ids_clean)]
+is2_timeseries = is2_timeseries[is2_timeseries['lake_id'].isin(lake_ids_clean)]
+
+
+# %% 2.0 Generate list of lakes with observations high enough for regression analysis
 high_obs_lakes = is2_lakes[is2_lakes['obs_dates_'] >= 8]
 high_obs_ids = high_obs_lakes['lake_id']
 print(len(high_obs_ids))
 
 high_obs_timeseries = is2_timeseries[is2_timeseries['lake_id'].isin(high_obs_ids)].copy()
+
+# %% 2.1 Check for lakes with observations in June and August
+
 high_obs_timeseries['obs_datetime'] = pd.to_datetime(high_obs_timeseries['obs_date'])
 high_obs_timeseries['obs_month'] = high_obs_timeseries.obs_datetime.dt.month.astype(str)
 
-months_check = high_obs_timeseries.groupby(by = 'lake_id')['obs_month'].agg(
+months_check = high_obs_timeseries.groupby(by='lake_id')['obs_month'].agg(
         june_obs=lambda x: '6' in x.unique(),
         sep_obs=lambda x: '8' in x.unique(),
 ).reset_index()
@@ -47,7 +59,14 @@ aug_sep_months_check = months_check[
 
 print(len(aug_sep_months_check))
 
-regression_lakes = is2_lakes[is2_lakes['lake_id'].isin(aug_sep_months_check['lake_id'])].copy()
+# %% 2.2 Select with greater than 8 observations and June / August observations
+
+regression_lakes = is2_lakes[
+        (is2_lakes['lake_id'].isin(aug_sep_months_check['lake_id'])) &
+        (is2_lakes['lake_id'].isin(high_obs_ids))
+].copy()
+print(len(regression_lakes))
+
 regression_lakes = regression_lakes.drop(
         columns=[
                 'zmed_all_s', 'zstd_all_s', 'z10_all_se', 'z90_all_se',
@@ -55,6 +74,18 @@ regression_lakes = regression_lakes.drop(
                 'Shape_Leng', 'Shape_Area'
                 ]
         )
+
+regression_timeseries = is2_timeseries[
+        (is2_timeseries['lake_id'].isin(aug_sep_months_check['lake_id'])) &
+        (is2_timeseries['lake_id'].isin(high_obs_ids))
+].copy()
+print(len(regression_timeseries))
+
+regression_timeseries['obs_datetime'] = pd.to_datetime(regression_timeseries['obs_date'])
+regression_timeseries['obs_month'] = regression_timeseries.obs_datetime.dt.month.astype(str)
+
+
+# %% 2.3 Buffer the regression lakes, and write to file
 
 def buffer_lakes_by_meters(geom, buffer_m):
         """Estimates each lake's local UTM, and then buffers by 120m
@@ -73,7 +104,8 @@ regression_lakes = regression_lakes.set_geometry('buffered')
 
 regression_lakes.drop(columns=['original_geom']).to_file('./data/lake_summaries/regression_lakes.shp', index=False)
 
-# %% Rasterization function
+# %% 3.0 Rasterize the high observation lakes for regression analysis
+# %% 3.1 Define function to rasterize individual lakes
 
 def rasterize_individual_lakes(row, dataset):
         temp = gpd.GeoDataFrame(
@@ -131,7 +163,7 @@ def rasterize_individual_lakes(row, dataset):
                 dst.write(lake_rasterized, 1)
 
 
-# %% Run the rasterization for both datasets
+# %% 3.2 Run the rasterization for both datasets (10m and 30m resolution)
 
 datasets = ['gswo', 'sentinel2']
 
@@ -142,12 +174,13 @@ for dataset in datasets:
                 dataset=dataset
         )
 
-# %%
+# %% 4.0 Generate optical seasonality table for the high observation lakes
+
+# %% 4.1 Get file paths for the rasterized lakes
 
 regression_lakes_paths = glob.glob('./data/regression_lakes_rasters/*.tif')
-test_cases = regression_lakes_paths[:5] + regression_lakes_paths[-5:]
 
-# %%
+# %% 4.2 Define function to read, mask, and calculate properties of the largest region
 
 def parse_file_names(path):
         pattern = r'.*/(.*?)_id_(.*?)__resolution(.*).tif'
@@ -157,9 +190,9 @@ def parse_file_names(path):
         )
 
         region = match.group(1)
-        id = match.group(2)
+        lake_id = match.group(2)
         resolution = match.group(3)
-        return region, resolution, id
+        return region, resolution, lake_id
 
 def read_data_and_masks(path):
     """
@@ -173,7 +206,7 @@ def read_data_and_masks(path):
         tuple: A tuple containing the lake mask, full water mask, and change data arrays.
     """
 
-    region, resolution, id = parse_file_names(path)
+    region, resolution, lake_id = parse_file_names(path)
 
     with rio.open(path) as src:
         lake_mask = src.read(1)
@@ -222,7 +255,7 @@ def read_data_and_masks(path):
 #     with rio.open(test_path, 'w', **out_meta) as dest:
 #         dest.write(label_data, 1)
 
-    return label_data_skimage, change_data 
+    return label_data_skimage, change_data, dataset, region, lake_id 
 
 def make_props_table_largest_area(label_data, change_data):
         """
@@ -270,18 +303,135 @@ def make_props_table_largest_area(label_data, change_data):
                         'count_decrease_pix': np.nan
                 })
                 return dummy_series
+
         largest_area = df.sort_values(by='area', ascending=False).iloc[0]
+
         return largest_area
+
+# %% 4.3 Generate the optical seasonality table
 
 data = []
 
 for i in regression_lakes_paths:
-      label_data, change_data = read_data_and_masks(i)
+      label_data, change_data, dataset, region, lake_id = read_data_and_masks(i)
       lake_data = make_props_table_largest_area(label_data, change_data)
+      lake_data['dataset'] = dataset
+      lake_data['region'] = region
+      lake_data['lake_id'] = lake_id
       data.append(lake_data)
 
-# %%
-area_results = pd.DataFrame(data)
+# %% 4.4 Calculate % seasonal change from pixel counts
 
-area_results['total_seasonal_fraction'] = area_results['count_increase_pix'] / area_results['area'] * 100
+area_results = pd.DataFrame(data)
+area_results.drop(columns=['label'], inplace=True)
+area_results = area_results.dropna()
+
+area_results['total_seasonal_decrease'] = (
+        area_results['count_decrease_pix'] / 
+        area_results['area'] * 
+        100
+)
+
+area_results['total_seasonal_increase'] = (
+        area_results['count_increase_pix'] /
+        area_results['area'] *
+        100
+)
+
+area_results['net_seasonal_change'] = (
+        area_results['total_seasonal_increase'] - 
+        area_results['total_seasonal_decrease']
+)
+
+area_results['lake_id_full'] = area_results['region'] + '_id_' + area_results['lake_id'].astype(str)
+area_results = area_results.drop(columns=['lake_id'])
+
+area_results.to_csv('./data/high_obs_lake_area_results.csv', index=False)
+
+# %% 5.0 Calculate ICEsat-2 seasonal change by lake
+
+icesat2_seasonal_change = regression_timeseries[
+        regression_timeseries['obs_month'].isin(['6', '8'])
+]
+
+icesat2_seasonal_change = icesat2_seasonal_change[
+        (icesat2_seasonal_change['zdif_date'] > -5) &
+        (icesat2_seasonal_change['zdif_date'] < 5)
+]
+
+icesat2_seasonal_change = icesat2_seasonal_change.groupby(
+        by=['lake_id', 'obs_month']
+).agg(
+        zdif_mean=('zdif_date', 'mean')
+).reset_index()
+
+icesat2_seasonal_change = icesat2_seasonal_change.pivot_table(
+        index='lake_id',
+        columns='obs_month',
+        values='zdif_mean'
+).reset_index()
+
+icesat2_seasonal_change['seasonal_change_icesat2'] = (
+        icesat2_seasonal_change['6'] - icesat2_seasonal_change['8']
+)
+
+icesat2_seasonal_change = icesat2_seasonal_change.drop(columns=['6', '8'])
+
+# 6.0 Merge the optical and ICESat-2 seasonal change tables
+
+seasonal_change = pd.merge(
+        area_results,
+        icesat2_seasonal_change,
+        left_on='lake_id_full',
+        right_on='lake_id',
+        how='outer'
+)
+
+seasonal_change = seasonal_change.drop(
+        columns=['area', 'count_wtr_pix', 'count_increase_pix', 
+        'count_decrease_pix', 'lake_id_full'])
+
+
+# %%
+
+colors = plt.cm.get_cmap('tab10', len(datasets))
+
+# Create a dictionary to map datasets to colors
+color_dict = {dataset: colors(i) for i, dataset in enumerate(datasets)}
+
+# Create a figure and axis
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Plot each dataset separately
+for dataset in datasets:
+    subset = seasonal_change[seasonal_change['dataset'] == dataset]
+    ax.scatter(
+        subset['seasonal_change_icesat2'],
+        subset['net_seasonal_change'],
+        label=dataset,
+        color=color_dict[dataset],
+        alpha=0.7,
+        edgecolors='w',
+        s=50
+    )
+
+# Customize the plot
+ax.set_xlabel('Seasonal Change ICESat-2 WSE (m)', fontsize=12)
+ax.set_ylabel('Net Seasonal Chang Area', fontsize=12)
+ax.set_title('james is dumb', fontsize=14)
+ax.legend(title='Dataset')
+ax.grid(True, linestyle='--', alpha=0.5)
+
+# Display the plot
+plt.tight_layout()
+plt.show()
+
+# %%
+
+# %%
+
+# %%
+
+# %%
+
 # %%
