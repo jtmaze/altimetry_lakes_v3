@@ -18,6 +18,7 @@ from skimage.measure import label, regionprops_table
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
+
 # %% 1.1 Load ICESat-2 data
 
 is2_lakes = gpd.read_file('./data/lake_summaries/matched_lakes_clean.shp')
@@ -36,7 +37,7 @@ is2_timeseries = is2_timeseries[is2_timeseries['lake_id'].isin(lake_ids_clean)]
 
 
 # %% 2.0 Generate list of lakes with observations high enough for regression analysis
-high_obs_lakes = is2_lakes[is2_lakes['obs_dates_'] >= 8]
+high_obs_lakes = is2_lakes[is2_lakes['obs_dates_'] >= 10]
 high_obs_ids = high_obs_lakes['lake_id']
 print(len(high_obs_ids))
 
@@ -83,7 +84,6 @@ print(len(regression_timeseries))
 
 regression_timeseries['obs_datetime'] = pd.to_datetime(regression_timeseries['obs_date'])
 regression_timeseries['obs_month'] = regression_timeseries.obs_datetime.dt.month.astype(str)
-
 
 # %% 2.3 Buffer the regression lakes, and write to file
 
@@ -161,7 +161,6 @@ def rasterize_individual_lakes(row, dataset):
                 transform=transform
         ) as dst:
                 dst.write(lake_rasterized, 1)
-
 
 # %% 3.2 Run the rasterization for both datasets (10m and 30m resolution)
 
@@ -372,7 +371,7 @@ icesat2_seasonal_change = icesat2_seasonal_change.pivot_table(
 ).reset_index()
 
 icesat2_seasonal_change['seasonal_change_icesat2'] = (
-        icesat2_seasonal_change['6'] - icesat2_seasonal_change['8']
+        icesat2_seasonal_change['8'] - icesat2_seasonal_change['6']
 )
 
 icesat2_seasonal_change = icesat2_seasonal_change.drop(columns=['6', '8'])
@@ -392,7 +391,13 @@ seasonal_change = seasonal_change.drop(
         'count_decrease_pix', 'lake_id_full'])
 
 
-# %%
+# %% 6.0 Plot the seasonal change comparison for ICESat-2 and Optical Data
+
+plot_df = seasonal_change.dropna(subset=['seasonal_change_icesat2', 'net_seasonal_change'])
+plot_df = plot_df[(plot_df['seasonal_change_icesat2'] > -1) & (plot_df['seasonal_change_icesat2'] < 1)]
+plot_df = plot_df[(plot_df['net_seasonal_change'] < 30) & (plot_df['net_seasonal_change'] > -30)]
+
+datasets = plot_df['dataset'].unique()
 
 colors = plt.cm.get_cmap('tab10', len(datasets))
 
@@ -404,25 +409,100 @@ fig, ax = plt.subplots(figsize=(8, 6))
 
 # Plot each dataset separately
 for dataset in datasets:
-    subset = seasonal_change[seasonal_change['dataset'] == dataset]
+    subset = plot_df[plot_df['dataset'] == dataset]
+    x = subset['seasonal_change_icesat2'].values
+    y = subset['net_seasonal_change'].values
+    
+    # Scatter plot
     ax.scatter(
-        subset['seasonal_change_icesat2'],
-        subset['net_seasonal_change'],
+        x,
+        y,
         label=dataset,
         color=color_dict[dataset],
         alpha=0.7,
         edgecolors='w',
         s=50
     )
+    
+    # Fit linear regression
+    if len(x) > 1:
+        coefficients = np.polyfit(x, y, 1)
+        poly1d_fn = np.poly1d(coefficients)
+        
+        x_line = np.linspace(np.min(x), np.max(x), 100)
+        y_line = poly1d_fn(x_line)
+        
+        ax.plot(
+            x_line,
+            y_line,
+            color=color_dict[dataset],
+            linestyle='--',
+            linewidth=2,
+            label=f'{dataset} Trendline'
+        )
 
-# Customize the plot
-ax.set_xlabel('Seasonal Change ICESat-2 WSE (m)', fontsize=12)
-ax.set_ylabel('Net Seasonal Chang Area', fontsize=12)
-ax.set_title('james is dumb', fontsize=14)
-ax.legend(title='Dataset')
+ax.set_xlabel('Seasonal Change ICESat-2 WSE (meters)', fontsize=12)
+ax.set_ylabel('Net Seasonal Area Change %', fontsize=12)
+ax.set_title('Seasonality Comparison by Lake', fontsize=14)
+ax.legend(title='Dataset and Trendlines')
 ax.grid(True, linestyle='--', alpha=0.5)
 
-# Display the plot
+plt.tight_layout()
+plt.show()
+
+# %%
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=True)
+
+regions = plot_df['region'].unique()
+
+# Iterate over regions and their corresponding axes
+for ax, region in zip(axes.flat, regions):
+    # Filter the data for the current region
+    region_data = plot_df[plot_df['region'] == region]
+    
+    # Plot each dataset within the current region
+    for dataset in datasets:
+        subset = region_data[region_data['dataset'] == dataset]
+        ax.scatter(
+            subset['seasonal_change_icesat2'],
+            subset['net_seasonal_change'],
+            label=dataset,
+            color=color_dict[dataset],
+            alpha=0.7,
+            edgecolors='w',
+            s=50
+        )
+
+        x = subset['seasonal_change_icesat2'].values
+        y = subset['net_seasonal_change'].values
+        if len(x) > 1:
+                coefficients = np.polyfit(x, y, 1)
+                poly1d_fn = np.poly1d(coefficients)
+                
+                x_line = np.linspace(np.min(x), np.max(x), 100)
+                y_line = poly1d_fn(x_line)
+                
+                ax.plot(
+                x_line,
+                y_line,
+                color=color_dict[dataset],
+                linestyle='--',
+                linewidth=2,
+                label=f'{dataset} Trendline'
+                )
+    
+    # Customize the subplot
+    ax.set_title(region)
+    ax.grid(True, linestyle='--', alpha=0.5)
+    ax.set_xlabel('Seasonal Change ICESat-2 WSE (meters)', fontsize=10)
+    ax.set_ylabel('Net Seasonal Area %', fontsize=10)
+
+# Add a global legend
+handles, labels = ax.get_legend_handles_labels()
+fig.legend(handles, labels, title='Dataset', loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=len(datasets))
+
+# Adjust layout
 plt.tight_layout()
 plt.show()
 
@@ -432,6 +512,62 @@ plt.show()
 
 # %%
 
+datasets = plot_df['dataset'].unique()
+
+colors = plt.cm.get_cmap('tab10', len(datasets))
+
+# Create a dictionary to map datasets to colors
+color_dict = {dataset: colors(i) for i, dataset in enumerate(datasets)}
+
+# Create a figure and axis
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Plot each dataset separately
+for dataset in datasets:
+    subset = plot_df[plot_df['dataset'] == dataset]
+    x = subset['seasonal_change_icesat2'].values
+    y = subset['net_seasonal_change'].values
+    
+    # Scatter plot
+    ax.scatter(
+        x,
+        y,
+        label=dataset,
+        color=color_dict[dataset],
+        alpha=0.7,
+        edgecolors='w',
+        s=50
+    )
+    
+    # Fit linear regression if there are enough data points
+    if len(x) > 1:
+        coefficients = np.polyfit(x, y, 1)
+        poly1d_fn = np.poly1d(coefficients)
+        
+        # Generate x values for plotting the trendline
+        x_line = np.linspace(np.min(x), np.max(x), 100)
+        y_line = poly1d_fn(x_line)
+        
+        # Plot the trendline
+        ax.plot(
+            x_line,
+            y_line,
+            color=color_dict[dataset],
+            linestyle='--',
+            linewidth=2,
+            label=f'{dataset} Trendline'
+        )
+
+# Customize the plot
+ax.set_xlabel('Seasonal Change ICESat-2 WSE (m)', fontsize=12)
+ax.set_ylabel('Net Seasonal Change Area', fontsize=12)
+ax.set_title('Seasonality Comparison by Lake', fontsize=14)
+ax.legend(title='Dataset and Trendlines')
+ax.grid(True, linestyle='--', alpha=0.5)
+
+# Display the plot
+plt.tight_layout()
+plt.show()
 # %%
 
 # %%
