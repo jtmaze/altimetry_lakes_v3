@@ -190,8 +190,6 @@ for dataset in datasets:
 
 seasonal_results = pd.concat(seasonal_diffs)
 
-
-
 # %%
 
 def by_roi_sensitivity_viz(df, roi_name):
@@ -294,7 +292,6 @@ is2_seasonality.drop(
     inplace=True)
 
 is2_seasonality.columns = is2_seasonality.columns.droplevel(1)
-
 
 # %% 
 def side_by_side_bar(df, x_var):
@@ -467,7 +464,7 @@ x = np.arange(len(is2_rescaled['roi_name']))
 width = 0.35
 
 bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
-bars_mean = ax.bar(x + width/2, matched_gswo.values, width, label='Sentinel-2 with matched subset', color='green', edgecolor='black', alpha=0.7)
+bars_mean = ax.bar(x + width/2, matched_gswo.values, width, label='GSWO with matched subset', color='green', edgecolor='black', alpha=0.7)
 
 ax.set_xticks(x)
 ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
