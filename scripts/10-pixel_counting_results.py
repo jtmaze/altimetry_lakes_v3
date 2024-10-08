@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
-pixels_summary = pd.read_csv('./data/pixel_counts_plz_work.csv')
+pixels_summary = pd.read_csv('./data/pixel_counts.csv')
 #all_lakes_summary = pd.read_csv('./data/pixel_counts_all_lakes.csv')
 
 is2_path = './data/lake_timeseries/*_timeseries.csv'
@@ -18,7 +18,6 @@ is2_data = pd.concat(is2_dfs)
 is2_rois = is2_data['roi_name'].unique()
 
 del is2_dfs, is2_path
-# %%
 
 # %% 2.0 Clean up the pixel counts datasets
 
@@ -39,7 +38,11 @@ print(f'{(over_max/(over_max + valid) * 100):.8f} % of pixels over max')
 
 # Swap values > 100 with 100
 pixels_clean = pixels_summary.copy()
-pixels_clean['pix_vals'] = np.where(pixels_clean['pix_vals'] > 100, 100, pixels_clean['pix_vals'])
+pixels_clean['pix_vals'] = np.where(pixels_clean['pix_vals'] > 100, 
+                                    100, 
+                                    pixels_clean['pix_vals']
+                            )
+
 pixels_clean = pixels_clean.groupby(
     by=['roi_name', 'dataset', 'scope', 'timeframe', 'buffer', 'pix_vals']
     ).agg(
@@ -69,9 +72,9 @@ obs_info = total_pixels.merge(total_measured,
 obs_info['pixel_frac_measured'] = obs_info['cnt_measured'] / obs_info['total_pix'] * 100
 
 pixels_clean = pixels_clean.merge(obs_info,
-                                   how='left',
-                                   on=['roi_name', 'dataset', 'buffer', 'timeframe', 'scope']
-                                   )
+                                  how='left',
+                                  on=['roi_name', 'dataset', 'buffer', 'timeframe', 'scope']
+                            )
 
 # %% 4.0 Calculate the water fractions
 
@@ -87,7 +90,7 @@ def count_below(df, threshold):
 
     return cnt_below
 
-# %%
+# %% 4.1 For various thresholds calculate the water fractions across rois, buffers, datasets, timeframes, and scopes
 
 timeframes = pixels_clean['timeframe'].unique().tolist()
 roi_names = pixels_clean['roi_name'].unique().tolist()
@@ -113,10 +116,15 @@ for roi_name in roi_names:
                         
                         wtr_cnt = count_above(temp, threshold)
                         land_cnt = count_below(temp, threshold)
+
                         if wtr_cnt == 0 and land_cnt == 0:
+                            print(f"""No data for: 
+                                  {roi_name}, {dataset}, {scope}, 
+                                  {timeframe}, {buffer}, {threshold}""")
                             continue
 
                         else:
+                            # Should only be one unique value for each of these
                             cnt_measured = temp['cnt_measured'].unique()
                             total_pix = temp['total_pix'].unique()
                             pixel_frac_measured = temp['pixel_frac_measured'].unique()
@@ -168,10 +176,11 @@ for dataset in datasets:
             ).reset_index()
         
         df['seasonality'] = df[('wtr_frac_measured', 'early')] - df[('wtr_frac_measured', 'late')]
+        df['satellite'] = 'sentinel2'
         
         seasonal_diffs.append(df)
         
-    elif dataset == 'gswo':
+    elif dataset in ['gswo', 'glad']:
         temp_gswo = temp.copy()
         temp_gswo['timeframe'] = temp_gswo['timeframe'].replace({
             'june': 'early',
@@ -185,13 +194,13 @@ for dataset in datasets:
             ).reset_index()
 
         df['seasonality'] = df[('wtr_frac_measured', 'early')] - df[('wtr_frac_measured', 'late')]
+        df['satellite'] = 'landsat'
 
         seasonal_diffs.append(df)
 
 seasonal_results = pd.concat(seasonal_diffs)
 
 # %%
-
 def by_roi_sensitivity_viz(df, roi_name):
     
     temp = df.copy()
@@ -236,14 +245,28 @@ def by_roi_sensitivity_viz(df, roi_name):
                 buffer_subset = subset[subset['buffer'] == buffer_val]
                 ax.plot(buffer_subset['threshold_int'], buffer_subset['seasonality'],
                         color=color_map[buffer_val], label=buffer_val, marker='o')
-            ax.set_title(f'ROI: {roi_name}, Dataset: {dataset}, Scope: {scope}')
-            ax.set_xlabel('Water Threshold')
-            ax.legend(title='Lake Buffer Value (m)')
+            ax.set_title(f'ROI: {roi_name}, Dataset: {dataset}, Scope: {scope}', fontsize=8)
 
-    axes[0][0].set_ylabel('% Change (Early - Late)')
+            # Create a single legend for all subplots
+            handles, labels = [], []
+            for buffer_val in unique_buffers:
+                handles.append(plt.Line2D([0], [0], color=color_map[buffer_val], marker='o', linestyle=''))
+                labels.append(f'{buffer_val} m')
+
+            fig.legend(handles, labels, title='Lake Buffer Value (m)', loc='upper center', ncol=len(unique_buffers), fontsize=12)
+            fig.subplots_adjust(bottom=0.25)  # Adjust the bottom to make more space for the legend
+
+    # Set common labels
+    axes[0][0].set_ylabel('All PLD Lakes', fontweight='bold', fontsize=12)
+    axes[1][0].set_ylabel('Matched IS2 Lakes', fontweight='bold', fontsize=12)
+    axes[1][0].set_xlabel('GLAD', fontweight='bold', fontsize=12)
+    axes[1][1].set_xlabel('GSWO', fontweight='bold', fontsize=12)
+    axes[1][2].set_xlabel('Sentinel-2', fontweight='bold', fontsize=12)
+    fig.text(0.5, 0.1, 'Water Occurrence Threshold (0-100)', ha='center', fontweight='bold', fontsize=16)
+    fig.text(0.04, 0.5, 'Seasonal Area % (From Masked Lake Pixels)', va='center', rotation='vertical', fontweight='bold', fontsize=16)
 
     # Adjust layout
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()
 
 for roi_name in roi_names:
@@ -308,39 +331,77 @@ def side_by_side_bar(df, x_var):
     df_pld_gswo = df[(df['scope'] == 'all_pld') & (df['dataset'] == 'gswo')]
     ds_pld_gswo = df_pld_gswo.groupby(x_var)['seasonality'].mean()
     
+    df_matched_glad = df[(df['scope'] == 'matched_is2') & (df['dataset'] == 'glad')]
+    ds_matched_glad = df_matched_glad.groupby(x_var)['seasonality'].mean()
+
+    df_pld_glad = df[(df['scope'] == 'all_pld') & (df['dataset'] == 'glad')]
+    ds_pld_glad = df_pld_glad.groupby(x_var)['seasonality'].mean()
+    
     # Prepare for plotting
-    unique_xvar = ds_matched_sentinel2.index.union(ds_pld_sentinel2.index).union(ds_matched_gswo.index).union(ds_pld_gswo.index)
+    unique_xvar = ds_matched_sentinel2.index.union(ds_pld_sentinel2.index)\
+                    .union(ds_matched_gswo.index).union(ds_pld_gswo.index)\
+                    .union(ds_matched_glad.index).union(ds_pld_glad.index)
     unique_xvar = sorted(unique_xvar)  # Sort the x variables for consistency
 
-    width = 0.2  # Bar width, adjusted for 4 bars
+    width = 0.13  # Bar width, adjusted for 6 bars
     ind = np.arange(len(unique_xvar))  # the x locations for the groups
+
+    colors = {
+        'Matched IS2 Sentinel2': '#aec7e8',  # Light Blue
+        'All PLD Sentinel2': '#1f77b4',      # Blue
+        'Matched IS2 GSWO': '#ffbb78',       # Light Orange
+        'All PLD GSWO': '#ff7f0e',           # Orange
+        'Matched IS2 GLAD': '#98df8a',       # Light Green
+        'All PLD GLAD': '#2ca02c'            # Green
+    }
 
     fig, ax = plt.subplots(figsize=(14, 6))
     
     # Plotting bars for each dataset
-    bars_matched_sentinel2 = ax.bar(ind - 1.5*width, 
+    bars_matched_sentinel2 = ax.bar(ind - 2.5*width, 
                                     ds_matched_sentinel2.reindex(unique_xvar).fillna(0).values, 
                                     width, 
+                                    color=colors['Matched IS2 Sentinel2'],
+                                    alpha=0.5,
                                     edgecolor='black', 
                                     label="Matched IS2 Sentinel2")
     
-    bars_pld_sentinel2 = ax.bar(ind - 0.5*width, 
+    bars_pld_sentinel2 = ax.bar(ind - 1.5*width, 
                                 ds_pld_sentinel2.reindex(unique_xvar).fillna(0).values, 
                                 width, 
+                                color=colors['All PLD Sentinel2'],
                                 edgecolor='black', 
                                 label="All PLD Sentinel2")
     
-    bars_matched_gswo = ax.bar(ind + 0.5*width, 
+    bars_matched_gswo = ax.bar(ind - 0.5*width, 
                                ds_matched_gswo.reindex(unique_xvar).fillna(0).values, 
                                width, 
+                               color=colors['Matched IS2 GSWO'],
+                               alpha=0.5,
                                edgecolor='black', 
                                label="Matched IS2 GSWO")
     
-    bars_pld_gswo = ax.bar(ind + 1.5*width, 
+    bars_pld_gswo = ax.bar(ind + 0.5*width, 
                            ds_pld_gswo.reindex(unique_xvar).fillna(0).values, 
                            width, 
+                           color=colors['All PLD GSWO'],
                            edgecolor='black', 
                            label="All PLD GSWO")
+    
+    bars_matched_glad = ax.bar(ind + 1.5*width, 
+                               ds_matched_glad.reindex(unique_xvar).fillna(0).values, 
+                               width, 
+                               color=colors['Matched IS2 GLAD'],
+                               alpha=0.5,
+                               edgecolor='black', 
+                               label="Matched IS2 GLAD")
+    
+    bars_pld_glad = ax.bar(ind + 2.5*width, 
+                           ds_pld_glad.reindex(unique_xvar).fillna(0).values, 
+                           width, 
+                           color=colors['All PLD GLAD'],
+                           edgecolor='black', 
+                           label="All PLD GLAD")
     
     # Set x-axis labels and legend
     ax.set_xticks(ind)
@@ -352,12 +413,15 @@ def side_by_side_bar(df, x_var):
     # Display the plot
     plt.show()
 
-    mean_values = (
+    # Calculate mean values
+    mean_values_matched_is2 = (
         ds_matched_sentinel2.reindex(unique_xvar).fillna(0) + 
-        ds_pld_sentinel2.reindex(unique_xvar).fillna(0) + 
+        #ds_pld_sentinel2.reindex(unique_xvar).fillna(0) + 
         ds_matched_gswo.reindex(unique_xvar).fillna(0) + 
-        ds_pld_gswo.reindex(unique_xvar).fillna(0)
-    ) / 4
+        #ds_pld_gswo.reindex(unique_xvar).fillna(0) + 
+        ds_matched_glad.reindex(unique_xvar).fillna(0) 
+        #ds_pld_glad.reindex(unique_xvar).fillna(0)
+    ) / 3
 
     sentinel2_mean = (
         ds_matched_sentinel2.reindex(unique_xvar).fillna(0) + 
@@ -369,7 +433,13 @@ def side_by_side_bar(df, x_var):
         ds_pld_gswo.reindex(unique_xvar).fillna(0)
     ) / 2
 
-    return unique_xvar, mean_values, sentinel2_mean, gswo_mean, ds_matched_sentinel2, ds_matched_gswo
+    glad_mean = (
+        ds_matched_glad.reindex(unique_xvar).fillna(0) + 
+        ds_pld_glad.reindex(unique_xvar).fillna(0)
+    ) / 2
+
+    return unique_xvar, mean_values_matched_is2, sentinel2_mean, gswo_mean, glad_mean, ds_matched_sentinel2, ds_matched_gswo, ds_matched_glad
+
 
 
 # %% Create seasonality df based on criteria
@@ -389,7 +459,7 @@ df_analyze = df_analyze[
     (df_analyze['buffer'] == 120) & (df_analyze['threshold'] == 80)
 ]
 
-ordered_rois, all_mean, sentinel2_mean, gswo_mean, matched_sentinel2, matched_gswo = side_by_side_bar(df_analyze, 'roi_name')
+ordered_rois, mean_values_matched_is2, sentinel2_mean, gswo_mean, glad_mean, matched_sentinel2, matched_gswo, matched_glad = side_by_side_bar(df_analyze, 'roi_name')
 
 # %% Visualize just the ICESat-2 WSE (m) seasonality
 
@@ -409,69 +479,200 @@ plt.ylabel('June - August WSE difference (m)')
 plt.show()
 
 # %% Compare mean of all optical datasets with ICESat-2
-is2_rescaled = is2_seasonality.copy()
-max_optical = all_mean.values.max()
-rescale_factor = max_optical / is2_rescaled['seasonality'].max()
-is2_rescaled['seasonality_rescaled'] = is2_rescaled['seasonality'] * rescale_factor
 
-x = np.arange(len(is2_rescaled['roi_name']))
-width = 0.35
+mean_values_df = mean_values_matched_is2.reset_index()
+mean_values_df.columns = ['roi_name', 'seasonality_mean']
+merged_df = pd.merge(is2_seasonality, mean_values_df, on='roi_name', how='inner')
+merged_df.rename(columns={'seasonality': 'seasonality_is2'}, inplace=True)
 
-fig, ax = plt.subplots(figsize=(14, 4))
+rescale_factor = 50
+merged_df['seasonality_is2_rescaled'] = merged_df['seasonality_is2'] * rescale_factor
 
-bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
-bars_mean = ax.bar(x + width/2, all_mean.values, width, label='Mean of all Optical Datasets', color='grey', edgecolor='black', alpha=0.7)
+# Set up the x-axis positions
+x = np.arange(len(merged_df['roi_name']))
+width = 0.35  # Width of the bars
 
-ax.set_xticks(x)
-ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
+fig, ax1 = plt.subplots(figsize=(14, 4))
 
-ax.set_ylabel('Seasonality Rescaled for Comparison')
-ax.legend()
+# Plot the optical dataset bars on ax1
+bars_mean = ax1.bar(x - width/2, merged_df['seasonality_mean'], width,
+                    label='Optical Area Change (% of Masked Pixels)',
+                    color='grey', edgecolor='black', alpha=0.7)
 
+# Plot the rescaled IS2 data on ax1
+bars_is2 = ax1.bar(x + width/2, merged_df['seasonality_is2_rescaled'], width,
+                   label='WSE Change (meters)', color='pink', edgecolor='black')
+
+# Set up the x-axis labels
+ax1.set_xticks(x)
+ax1.set_xticklabels(merged_df['roi_name'], rotation=0)
+ax1.set_ylabel('Area Change % of Masked Pixels')
+
+# Create a secondary y-axis
+ax2 = ax1.twinx()
+ax2.set_ylim(ax1.get_ylim()[0] / rescale_factor, ax1.get_ylim()[1] / rescale_factor)
+ax2.set_ylabel('WSE Change (meters)')
+
+# Adjust the secondary y-axis ticks to be meaningful
+ax2_ticks = ax1.get_yticks()
+ax2.set_yticks(ax2_ticks / rescale_factor)
+ax2.set_yticklabels([f"{tick:.2f}" for tick in ax2.get_yticks()])
+
+# Create a combined legend
+handles1, labels1 = ax1.get_legend_handles_labels()
+ax1.legend(handles1, labels1, loc='upper left')
+
+plt.title('Mean Across Optical Datasets and IS2 Seasonality')
+
+# Display the plot
 plt.show()
 
 # %% Compare the matched Sentinel-2 lakes and ICESat-2
-is2_rescaled = is2_seasonality.copy()
-max_optical = matched_sentinel2.values.max()
-rescale_factor = max_optical / is2_rescaled['seasonality'].max()
-is2_rescaled['seasonality_rescaled'] = is2_rescaled['seasonality'] * rescale_factor
+optical_values_df = matched_sentinel2.reset_index()
+optical_values_df.columns = ['roi_name', 'seasonality_mean']
+merged_df = pd.merge(is2_seasonality, optical_values_df, on='roi_name', how='inner')
+merged_df.rename(columns={'seasonality': 'seasonality_is2'}, inplace=True)
 
-fig, ax = plt.subplots(figsize=(14, 4))
+rescale_factor = 50
+merged_df['seasonality_is2_rescaled'] = merged_df['seasonality_is2'] * rescale_factor
 
-x = np.arange(len(is2_rescaled['roi_name']))
-width = 0.35
+# Set up the x-axis positions
+x = np.arange(len(merged_df['roi_name']))
+width = 0.35  # Width of the bars
 
-bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
-bars_mean = ax.bar(x + width/2, matched_sentinel2.values, width, label='Sentinel-2 with matched subset', color='blue', edgecolor='black', alpha=0.7)
+fig, ax1 = plt.subplots(figsize=(14, 4))
 
-ax.set_xticks(x)
-ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
+# Plot the optical dataset bars on ax1
+bars_mean = ax1.bar(x - width/2, merged_df['seasonality_mean'], width,
+                    label='Optical Area Change (% of Masked Pixels)',
+                    color='blue', edgecolor='black', alpha=0.7)
 
-ax.set_ylabel('Seasonality Rescaled for Comparison')
-ax.legend()
+# Plot the rescaled IS2 data on ax1
+bars_is2 = ax1.bar(x + width/2, merged_df['seasonality_is2_rescaled'], width,
+                   label='WSE Change (meters)', color='pink', edgecolor='black')
 
+# Set up the x-axis labels
+ax1.set_xticks(x)
+ax1.set_xticklabels(merged_df['roi_name'], rotation=0)
+ax1.set_ylabel('Area Change % of Masked Pixels')
+
+# Create a secondary y-axis
+ax2 = ax1.twinx()
+ax2.set_ylim(ax1.get_ylim()[0] / rescale_factor, ax1.get_ylim()[1] / rescale_factor)
+ax2.set_ylabel('WSE Change (meters)')
+
+# Adjust the secondary y-axis ticks to be meaningful
+ax2_ticks = ax1.get_yticks()
+ax2.set_yticks(ax2_ticks / rescale_factor)
+ax2.set_yticklabels([f"{tick:.2f}" for tick in ax2.get_yticks()])
+
+# Create a combined legend
+handles1, labels1 = ax1.get_legend_handles_labels()
+ax1.legend(handles1, labels1, loc='upper left')
+
+plt.title('Matched Sentinel-2 and IS2 Seasonality')
+
+# Display the plot
 plt.show()
 
+
 # %% Compare the matched GSWO lakes and ICESat-2
-is2_rescaled = is2_seasonality.copy()
-max_optical = matched_gswo.values.max()
-rescale_factor = max_optical / is2_rescaled['seasonality'].max()
-is2_rescaled['seasonality_rescaled'] = is2_rescaled['seasonality'] * rescale_factor
 
-fig, ax = plt.subplots(figsize=(14, 4))
+optical_values_df = matched_gswo.reset_index()
+optical_values_df.columns = ['roi_name', 'seasonality_mean']
+merged_df = pd.merge(is2_seasonality, optical_values_df, on='roi_name', how='inner')
+merged_df.rename(columns={'seasonality': 'seasonality_is2'}, inplace=True)
 
-x = np.arange(len(is2_rescaled['roi_name']))
-width = 0.35
+rescale_factor = 50
+merged_df['seasonality_is2_rescaled'] = merged_df['seasonality_is2'] * rescale_factor
 
-bars = ax.bar(x - width/2, is2_rescaled['seasonality_rescaled'], width, label='IS2 Seasonality Rescaled', color='pink', edgecolor='black')
-bars_mean = ax.bar(x + width/2, matched_gswo.values, width, label='GSWO with matched subset', color='green', edgecolor='black', alpha=0.7)
+# Set up the x-axis positions
+x = np.arange(len(merged_df['roi_name']))
+width = 0.35  # Width of the bars
 
-ax.set_xticks(x)
-ax.set_xticklabels(is2_rescaled['roi_name'], rotation=0)
+fig, ax1 = plt.subplots(figsize=(14, 4))
 
-ax.set_ylabel('Seasonality Rescaled for Comparison')
-ax.legend()
+# Plot the optical dataset bars on ax1
+bars_mean = ax1.bar(x - width/2, merged_df['seasonality_mean'], width,
+                    label='Optical Area Change (% of Masked Pixels)',
+                    color='orange', edgecolor='black', alpha=0.7)
 
+# Plot the rescaled IS2 data on ax1
+bars_is2 = ax1.bar(x + width/2, merged_df['seasonality_is2_rescaled'], width,
+                   label='WSE Change (meters)', color='pink', edgecolor='black')
+
+# Set up the x-axis labels
+ax1.set_xticks(x)
+ax1.set_xticklabels(merged_df['roi_name'], rotation=0)
+ax1.set_ylabel('Area Change % of Masked Pixels')
+
+# Create a secondary y-axis
+ax2 = ax1.twinx()
+ax2.set_ylim(ax1.get_ylim()[0] / rescale_factor, ax1.get_ylim()[1] / rescale_factor)
+ax2.set_ylabel('WSE Change (meters)')
+
+# Adjust the secondary y-axis ticks to be meaningful
+ax2_ticks = ax1.get_yticks()
+ax2.set_yticks(ax2_ticks / rescale_factor)
+ax2.set_yticklabels([f"{tick:.2f}" for tick in ax2.get_yticks()])
+
+# Create a combined legend
+handles1, labels1 = ax1.get_legend_handles_labels()
+ax1.legend(handles1, labels1, loc='upper left')
+
+plt.title('GSWO and IS2 Seasonality')
+
+# Display the plot
+plt.show()
+
+# %% Compare the matched GLAD lakes and ICESat-2
+
+
+optical_values_df = matched_glad.reset_index()
+optical_values_df.columns = ['roi_name', 'seasonality_mean']
+merged_df = pd.merge(is2_seasonality, optical_values_df, on='roi_name', how='inner')
+merged_df.rename(columns={'seasonality': 'seasonality_is2'}, inplace=True)
+
+rescale_factor = 50
+merged_df['seasonality_is2_rescaled'] = merged_df['seasonality_is2'] * rescale_factor
+
+# Set up the x-axis positions
+x = np.arange(len(merged_df['roi_name']))
+width = 0.35  # Width of the bars
+
+fig, ax1 = plt.subplots(figsize=(14, 4))
+
+# Plot the optical dataset bars on ax1
+bars_mean = ax1.bar(x - width/2, merged_df['seasonality_mean'], width,
+                    label='Optical Area Change (% of Masked Pixels)',
+                    color='green', edgecolor='black', alpha=0.7)
+
+# Plot the rescaled IS2 data on ax1
+bars_is2 = ax1.bar(x + width/2, merged_df['seasonality_is2_rescaled'], width,
+                   label='WSE Change (meters)', color='pink', edgecolor='black')
+
+# Set up the x-axis labels
+ax1.set_xticks(x)
+ax1.set_xticklabels(merged_df['roi_name'], rotation=0)
+ax1.set_ylabel('Area Change % of Masked Pixels')
+
+# Create a secondary y-axis
+ax2 = ax1.twinx()
+ax2.set_ylim(ax1.get_ylim()[0] / rescale_factor, ax1.get_ylim()[1] / rescale_factor)
+ax2.set_ylabel('WSE Change (meters)')
+
+# Adjust the secondary y-axis ticks to be meaningful
+ax2_ticks = ax1.get_yticks()
+ax2.set_yticks(ax2_ticks / rescale_factor)
+ax2.set_yticklabels([f"{tick:.2f}" for tick in ax2.get_yticks()])
+
+# Create a combined legend
+handles1, labels1 = ax1.get_legend_handles_labels()
+ax1.legend(handles1, labels1, loc='upper left')
+
+plt.title('GSWO and IS2 Seasonality')
+
+# Display the plot
 plt.show()
 
 # %%

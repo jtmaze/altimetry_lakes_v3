@@ -43,7 +43,13 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band, buffer):
 
     print(f'Processing {roi_name} {timeframe} {buffer} {dataset} {scope}')
     path_recurrence_raster = f'./data/recurrence_clean/Recurrence_{roi_name}_timeframe_{timeframe}_dataset_{dataset}.tif'
-    path_lakes = f'./data/lake_summaries/{scope}_scope_{dataset}_{roi_name}_rasterized_buffers.tif'
+    if dataset == 'sentinel2':
+        satellite = 'sentinel2'
+    else:
+        satellite = 'landsat'
+    
+
+    path_lakes = f'./data/lake_summaries/{scope}_scope_{satellite}_{roi_name}_rasterized_buffers.tif'
 
     # Quick error handling, some combinations will not exist, because the
     # timeframes are named differently between GSWO and Sentinel-2. 
@@ -68,6 +74,7 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band, buffer):
     matched_data = np.where(mask_bool, target_data, -1)
     matched_data = np.squeeze(matched_data) # Need to squeeze because GSWO datasets have an extra dimension (i.e. L, H, W)
 
+    # Write select masked rasters to drive
     if (buffer == 120) and (roi_name in ['AKCP', 'YKdelta', 'YKflats', 'MRD_TUK_Anderson']):
         
         output_path = f'./data/masked_rasters/scope_{scope}__roi_{roi_name}__timeframe_{timeframe}__dataset_{dataset}__buffer{buffer}.tif'
@@ -83,7 +90,7 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band, buffer):
             
     return matched_data
 
-def create_summary_df(matched_data, roi, timeframe, dataset, scope):
+def create_summary_df(matched_data, roi, timeframe, dataset, scope, buffer_val):
     """
     Create a summary DataFrame from the masked data.
     """
@@ -100,15 +107,14 @@ def create_summary_df(matched_data, roi, timeframe, dataset, scope):
 
     return df
 
-
-
 # %% Run the functions
 
 buffer_vals = [60, 90, 120] # meters
 scopes = ['all_pld', 'matched_is2']
 results = []
 timeframes = ['years2016-2023_weeks22-26', 'aug', 'years2016-2023_weeks31-35', 'june']
-rois = ['AKCP']
+
+results = []
 
 for roi in rois:
     for scope in scopes:
@@ -124,7 +130,8 @@ for roi in rois:
                                                         roi,
                                                         timeframe,
                                                         dataset,
-                                                        scope
+                                                        scope,
+                                                        buffer_val
                                                         )
                                     )
 
@@ -133,6 +140,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-#full_results.to_csv('./data/pixel_counts_it_works.csv', index=False)
+full_results.to_csv('./data/pixel_counts.csv', index=False)
 
 # %%

@@ -23,22 +23,24 @@ We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have
 resolutions. Need to run this script multiple times, changing the dataset (gswo or sentinel2)
 or the scope (all_pld or matched_is2).
 """
-dataset = 'sentinel2'
-scope = 'all_pld'
+dataset = 'landsat'
+scope = 'matched_is2'
 
 """This code for matched ICESat-2 lakes"""
-# lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
-# lakes = gpd.read_file(lakes_path)
-
-"""This code for all the clipped PLD lakes"""
-lakes_path = './data/pld_clipped/*.shp'
-pld_files = glob.glob(lakes_path)
-pld_gdfs = [gpd.read_file(file) for file in pld_files]
-lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
-
+lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
+lakes = gpd.read_file(lakes_path)
 rois_list = lakes['roi_name'].unique().tolist()
 rois_remove = ['MRD', 'TUK', 'anderson_plain']
 rois_list = [roi for roi in rois_list if roi not in rois_remove]
+
+"""This code for all the clipped PLD lakes"""
+# lakes_path = './data/pld_clipped/*.shp'
+# pld_files = glob.glob(lakes_path)
+# pld_gdfs = [gpd.read_file(file) for file in pld_files]
+# lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
+# rois_list = lakes['roi_name'].unique().tolist()
+# rois_remove = ['MRD', 'TUK', 'anderson_plain']
+# rois_list = [roi for roi in rois_list if roi not in rois_remove]
 
 # %% 2.0 Choose buffer values to apply to lakes.
 
@@ -57,7 +59,12 @@ def read_recurrence_raster(roi_name, dataset):
     """
     Read the first matching recurrence raster file based on ROI name and dataset.
     """
-    recurrence_path = f'./data/recurrence_clean/Recurrence_{roi_name}_*_dataset_{dataset}.tif'
+    if dataset == 'landsat':
+        ds = 'gswo'
+    elif dataset == 'sentinel2':
+        ds = 'sentinel2'
+
+    recurrence_path = f'./data/recurrence_clean/Recurrence_{roi_name}_*_dataset_{ds}.tif'
     matched_reccurence = glob.glob(recurrence_path) 
     # There will be multiple matched files, but they all have the same metadata
     matched_reccurence_first = matched_reccurence[0]

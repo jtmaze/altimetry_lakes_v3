@@ -102,7 +102,7 @@ for f in sub_roi_files:
             })
             #print(out_meta)
 
-        roi_pattern = r'(gswo|sentinel2)_(.*?)(_rasterized_buffers.tif)'
+        roi_pattern = r'(landsat|sentinel2)_(.*?)(_rasterized_buffers.tif)'
         out_path = re.sub(roi_pattern, rf'\1_{name}\3', f)
         print(f)
         print('---------')
