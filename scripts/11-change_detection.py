@@ -42,9 +42,9 @@ for p in masked_raster_paths:
 
 # %% 3.0 Change detection by simply subtracting pixel values. 
 
-def sort_gswo_key(raster):
+def sort_landsat_key(raster):
     """
-    Sort function for GSWO rasters based on month names.
+    Sort function for Landsat rasters based on month names.
     """
     timeframe, _ = raster
     timeframe_map = {'june': 6, 'aug': 8}
@@ -125,48 +125,53 @@ def change_by_water_mask(
             change_classified.rio.to_raster(output_path)
             
 
-# %% 
+# %% Generate change maps. 
 
 for key, rasters in raster_change_dict.items():
     scope, roi, dataset, buffer = key
+
+    if roi == 'AKCP':
+        continue
+
+    else:
     # Sort rasters into proper order before change detection
-    if dataset == 'gswo':        
-        sorted_rasters = sorted(rasters, key=sort_gswo_key)
-    else:   
-        sorted_rasters = sorted(rasters)  # sorted by timeframe
+        if dataset in ['gswo', 'glad']:        
+            sorted_rasters = sorted(rasters, key=sort_landsat_key)
+        else:   
+            sorted_rasters = sorted(rasters)  # sorted by timeframe
 
-    # We will process the rasters two at a time (pairwise)
-    for i in range(len(sorted_rasters) - 1):
-        # Get the current raster and the next one for comparison
-        (timeframe1, path1) = sorted_rasters[i]
-        (timeframe2, path2) = sorted_rasters[i + 1]
+        # We will process the rasters two at a time (pairwise)
+        for i in range(len(sorted_rasters) - 1):
+            # Get the current raster and the next one for comparison
+            (timeframe1, path1) = sorted_rasters[i]
+            (timeframe2, path2) = sorted_rasters[i + 1]
 
-        print(roi)
+            print(roi)
 
-        simple_raster_subtraction_rxr(
-            src_early_path=path1,
-            src_late_path=path2, 
-            roi=roi, 
-            dataset=dataset, 
-            scope=scope, 
-            timeframe1=timeframe1, 
-            timeframe2=timeframe2, 
-            buffer=buffer, 
-            write_file=False
-        )
+            simple_raster_subtraction_rxr(
+                src_early_path=path1,
+                src_late_path=path2, 
+                roi=roi, 
+                dataset=dataset, 
+                scope=scope, 
+                timeframe1=timeframe1, 
+                timeframe2=timeframe2, 
+                buffer=buffer, 
+                write_file=True
+            )
 
-        change_by_water_mask(
-            src_early_path=path1,
-            src_late_path=path2, 
-            threshold=80,
-            roi=roi,
-            dataset=dataset,
-            scope=scope,
-            timeframe1=timeframe1,
-            timeframe2=timeframe2,
-            buffer=buffer,
-            write_file=True
-        )
+            change_by_water_mask(
+                src_early_path=path1,
+                src_late_path=path2, 
+                threshold=80,
+                roi=roi,
+                dataset=dataset,
+                scope=scope,
+                timeframe1=timeframe1,
+                timeframe2=timeframe2,
+                buffer=buffer,
+                write_file=True
+            )
                             
 
  # %% 4.0 Change detection via thresholds and classifacation

@@ -111,7 +111,6 @@ def create_summary_df(matched_data, roi, timeframe, dataset, scope, buffer_val):
 
 buffer_vals = [60, 90, 120] # meters
 scopes = ['all_pld', 'matched_is2']
-results = []
 timeframes = ['years2016-2023_weeks22-26', 'aug', 'years2016-2023_weeks31-35', 'june']
 
 results = []
@@ -140,6 +139,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-full_results.to_csv('./data/pixel_counts.csv', index=False)
+full_results.to_csv('./data/pixel_counts_not_fuckup2.csv', index=False)
 
 # %%

@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
 pixels_summary = pd.read_csv('./data/pixel_counts.csv')
-#all_lakes_summary = pd.read_csv('./data/pixel_counts_all_lakes.csv')
 
 is2_path = './data/lake_timeseries/*_timeseries.csv'
 is2_files = glob.glob(is2_path)
@@ -172,10 +171,10 @@ for dataset in datasets:
         df = temp_s2.pivot_table(
             index=['roi_name', 'buffer', 'dataset', 'threshold', 'scope'],
             columns=['timeframe'],
-            values=['total_pix', 'wtr_frac_measured', 'land_frac_measured']
+            values=['total_pix', 'wtr_frac_measured', 'land_frac_measured', 'wtr_frac_total']
             ).reset_index()
         
-        df['seasonality'] = df[('wtr_frac_measured', 'early')] - df[('wtr_frac_measured', 'late')]
+        df['seasonality'] = df[('wtr_frac_total', 'early')] - df[('wtr_frac_total', 'late')]
         df['satellite'] = 'sentinel2'
         
         seasonal_diffs.append(df)
@@ -190,10 +189,10 @@ for dataset in datasets:
         df = temp_gswo.pivot_table(
             index=['roi_name', 'buffer', 'dataset', 'threshold', 'scope'],
             columns=['timeframe'],
-            values=['total_pix', 'wtr_frac_measured', 'land_frac_measured']
+            values=['total_pix', 'wtr_frac_measured', 'land_frac_measured', 'wtr_frac_total']
             ).reset_index()
 
-        df['seasonality'] = df[('wtr_frac_measured', 'early')] - df[('wtr_frac_measured', 'late')]
+        df['seasonality'] = df[('wtr_frac_total', 'early')] - df[('wtr_frac_total', 'late')]
         df['satellite'] = 'landsat'
 
         seasonal_diffs.append(df)
@@ -406,7 +405,7 @@ def side_by_side_bar(df, x_var):
     # Set x-axis labels and legend
     ax.set_xticks(ind)
     ax.set_xticklabels(unique_xvar, rotation=0)  # Rotate labels if they are lengthy
-    ax.set_xlabel(x_var)
+    ax.set_xlabel('ROI Name', fontweight='bold', fontsize=14)
     ax.set_ylabel('Percent change (of lake mask) early to late summer')
     ax.legend()
 
