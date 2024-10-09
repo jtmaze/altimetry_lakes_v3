@@ -13,7 +13,7 @@ os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
 masked_raster_paths = glob.glob('./data/masked_rasters/*.tif')
 
-# %% 2.0 Get file information and make dictionary to contrast time perioeds. 
+# %% 2.0 Get file information and make dictionary to contrast time periods. 
 
 def parse_file_names(file_path):
 
@@ -83,6 +83,7 @@ def simple_raster_subtraction_rxr(
         data_late = rxr.open_rasterio(src_late_path, chunks='auto').astype('int16')
 
         change_data = data_late - data_early
+        # Write 'no data' value to -110 outside PLD mask
         change_data = change_data.where((data_early != -1) & (data_late != -1), -110)
         change_data.rio.write_nodata(-110, inplace=True)
         output_path = f'./data/change_maps/RasterChange__{roi}__{dataset}__{scope}__change__{timeframe1}_to_{timeframe2}_buffer{buffer}.tif'
@@ -96,43 +97,40 @@ def change_by_water_mask(
 ):
 
     if write_file:
-        with rio.open(src_early_path) as src_early, rio.open(src_late_path) as src_late:
-            data_early = rxr.open_rasterio(src_early_path, chunks='auto').astype('int8')
-            data_late = rxr.open_rasterio(src_late_path, chunks='auto').astype('int8')
-            data_early_crs = data_early.rio.crs
-            print(data_early_crs)
-            lake_mask_early = xr.where(data_early >= threshold, 1, 0)
-            lake_mask_late = xr.where(data_late >= threshold, 1, 0)
-            na_mask = (data_early == -1) | (data_late == -1)
-            # Clean up memory by deleting
-            del data_early, data_late
-
-               
-            change_classified = xr.full_like(lake_mask_early, 0, dtype='uint8')
+        data_early = rxr.open_rasterio(src_early_path, chunks='auto').astype('int8')
+        data_late = rxr.open_rasterio(src_late_path, chunks='auto').astype('int8')
+        data_early_crs = data_early.rio.crs
+        print(data_early_crs)
+        lake_mask_early = xr.where(data_early >= threshold, 1, 0)
+        lake_mask_late = xr.where(data_late >= threshold, 1, 0)
+        na_mask = (data_early == -1) | (data_late == -1)
+        # Clean up memory by deleting
+        del data_early, data_late
             
-            change_classified = xr.where((lake_mask_early == 1) & (lake_mask_late == 1), 1, change_classified) # 1 = water, no change
-            change_classified = xr.where((lake_mask_early == 0) & (lake_mask_late == 1), 2, change_classified) # 2 = water, seasonal increase
-            change_classified = xr.where((lake_mask_early == 1) & (lake_mask_late == 0), 3, change_classified) # 3 = water, seasonal decrease
-            change_classified = xr.where((lake_mask_early == 0) & (lake_mask_late == 0), 4, change_classified) # 4 = land, no change
-            change_classified = change_classified.where(~na_mask)
+        change_classified = xr.full_like(lake_mask_early, 0, dtype='uint8')
+        
+        change_classified = xr.where((lake_mask_early == 1) & (lake_mask_late == 1), 1, change_classified) # 1 = water, no change
+        change_classified = xr.where((lake_mask_early == 0) & (lake_mask_late == 1), 2, change_classified) # 2 = water, seasonal increase
+        change_classified = xr.where((lake_mask_early == 1) & (lake_mask_late == 0), 3, change_classified) # 3 = water, seasonal decrease
+        change_classified = xr.where((lake_mask_early == 0) & (lake_mask_late == 0), 4, change_classified) # 4 = land, no change
+        change_classified = change_classified.where(~na_mask)
 
-            change_classified.rio.write_crs(data_early_crs, inplace=True)
+        change_classified.rio.write_crs(data_early_crs, inplace=True)
 
-            del lake_mask_early, lake_mask_late, na_mask
+        del lake_mask_early, lake_mask_late, na_mask
 
-            output_path = f'./data/change_maps/MaskChange__{roi}__{dataset}__{scope}__change__{timeframe1}_to_{timeframe2}_buffer{buffer}.tif'
-            print(f'writing file to {output_path}')
-            change_classified.rio.to_raster(output_path)
-            
+        output_path = f'./data/change_maps/MaskChange__{roi}__{dataset}__{scope}__change__{timeframe1}_to_{timeframe2}_buffer{buffer}.tif'
+        print(f'writing file to {output_path}')
+        change_classified.rio.to_raster(output_path)
+        
 
 # %% Generate change maps. 
 
 for key, rasters in raster_change_dict.items():
     scope, roi, dataset, buffer = key
 
-    if roi == 'AKCP':
+    if scope == 'matched_is2':
         continue
-
     else:
     # Sort rasters into proper order before change detection
         if dataset in ['gswo', 'glad']:        

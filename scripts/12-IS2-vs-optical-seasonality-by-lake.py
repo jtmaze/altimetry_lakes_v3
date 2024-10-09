@@ -164,9 +164,9 @@ def rasterize_individual_lakes(row, dataset):
 
 # %% 3.2 Run the rasterization for both datasets (10m and 30m resolution)
 
-datasets = ['gswo', 'sentinel2']
+satellites = ['gswo', 'sentinel2']
 
-for dataset in datasets:
+for s in satellites:
         regression_lakes.apply(
                 rasterize_individual_lakes, 
                 axis=1, 
@@ -219,7 +219,7 @@ def read_data_and_masks(path):
         dataset = 'sentinel2'
         min_sieve_size = 30
     
-    change_map_pattern = f'./data/change_maps/MaskChange__{region}__{dataset}__matched_is2_*.tif'
+    change_map_pattern = f'./data/change_maps/MaskChange__{region}__{dataset}__*.tif'
     change_map_path = glob.glob(change_map_pattern)[0]
 
     with rio.open(change_map_path) as src:
