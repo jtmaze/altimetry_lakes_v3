@@ -27,7 +27,7 @@ is2_lakes.drop(columns=['roi_name'], inplace=True)
 is2_timeseries_paths = glob.glob('./data/lake_timeseries/*_timeseries.csv')
 is2_timeseries = [pd.read_csv(p) for p in is2_timeseries_paths]
 is2_timeseries = pd.concat(is2_timeseries)
-is2_timeseries.drop(columns=['Unnamed: 0', 'geometry'], inplace=True)
+is2_timeseries.drop(columns=['geometry'], inplace=True)
 
 lake_ids_clean_path = './data/clean_ids.csv'
 lake_ids_clean = pd.read_csv(lake_ids_clean_path)['lake_id']
@@ -107,7 +107,7 @@ regression_lakes.drop(columns=['original_geom']).to_file('./data/lake_summaries/
 # %% 3.0 Rasterize the high observation lakes for regression analysis
 # %% 3.1 Define function to rasterize individual lakes
 
-def rasterize_individual_lakes(row, dataset):
+def rasterize_individual_lakes(row, satellite):
         temp = gpd.GeoDataFrame(
                 row.to_frame().T,
                 geometry='buffered',
@@ -122,7 +122,12 @@ def rasterize_individual_lakes(row, dataset):
         region = lake_id.split('_id_')[0]
 
         # Find source raster file
-        src_pattern = f'./data/change_maps/MaskChange__{region}__{dataset}__matched_is2*.tif'
+        if satellite == 'landsat':
+                dataset = 'gswo'
+        elif satellite == 'sentinel2':
+                dataset = 'sentinel2'
+
+        src_pattern = f'./data/change_maps/MaskChange__{region}__{dataset}__*.tif'
         src_path = glob.glob(src_pattern)[0]
 
         with rio.open(src_path) as src:
@@ -143,9 +148,9 @@ def rasterize_individual_lakes(row, dataset):
         )
 
         # Write the raster to a file
-        if dataset == 'gswo':
+        if satellite in ['landsat', 'gswo']:
                 resolution = 30
-        elif dataset == 'sentinel2':
+        elif satellite == 'sentinel2':
                 resolution = 10
         out_path =f'./data/regression_lakes_rasters/{lake_id}__resolution{resolution}.tif'
 
@@ -162,15 +167,15 @@ def rasterize_individual_lakes(row, dataset):
         ) as dst:
                 dst.write(lake_rasterized, 1)
 
-# %% 3.2 Run the rasterization for both datasets (10m and 30m resolution)
+# %% 3.2 Run the rasterization for both satellites (10m and 30m resolution)
 
-satellites = ['gswo', 'sentinel2']
+satellites = ['landsat', 'sentinel2']
 
 for s in satellites:
         regression_lakes.apply(
                 rasterize_individual_lakes, 
                 axis=1, 
-                dataset=dataset
+                satellite=s
         )
 
 # %% 4.0 Generate optical seasonality table for the high observation lakes
@@ -193,7 +198,7 @@ def parse_file_names(path):
         resolution = match.group(3)
         return region, resolution, lake_id
 
-def read_data_and_masks(path):
+def read_data_and_masks(path, dataset):
     """
     Reads lake mask and change data for a given region and scope.
 
@@ -207,54 +212,60 @@ def read_data_and_masks(path):
 
     region, resolution, lake_id = parse_file_names(path)
 
-    with rio.open(path) as src:
-        lake_mask = src.read(1)
-        bounds = src.bounds
-        lake_crs = src.crs
-
-    if resolution == '30':
-        dataset = 'gswo'
-        min_sieve_size = 10
-    elif resolution == '10':
-        dataset = 'sentinel2'
-        min_sieve_size = 30
+    if resolution == '10' and dataset in ['gswo', 'landsat']:
+        return None, None, None, None
+    if resolution == '30' and dataset == 'sentinel2':
+        return None, None, None, None
     
-    change_map_pattern = f'./data/change_maps/MaskChange__{region}__{dataset}__*.tif'
-    change_map_path = glob.glob(change_map_pattern)[0]
+    else:
 
-    with rio.open(change_map_path) as src:
-        window = from_bounds(*bounds, src.transform)
-        change_data = src.read(1, window=window)
-        full_wtr_mask = np.where(np.isin(change_data, [1, 2, 3]), 1, 0).astype('uint8')
-        window_transform = src.window_transform(window)
-        change_crs = src.crs
+        if resolution == '30':
+                min_sieve_size = 10
+        elif resolution == '10':
+               min_sieve_size = 30
+
+        with rio.open(path) as src:
+                lake_mask = src.read(1)
+                bounds = src.bounds
+                lake_crs = src.crs
+
+        change_map_pattern = f'./data/change_maps/MaskChange__{region}__{dataset}__*.tif'
+        change_map_path = glob.glob(change_map_pattern)[0]
+
+        with rio.open(change_map_path) as src:
+                window = from_bounds(*bounds, src.transform)
+                change_data = src.read(1, window=window)
+                full_wtr_mask = np.where(np.isin(change_data, [1, 2, 3]), 1, 0).astype('uint8')
+                window_transform = src.window_transform(window)
+                change_crs = src.crs
 
 
-    label_data = np.where((lake_mask == 1), full_wtr_mask, 0).astype('uint8')
-    label_data = ski.morphology.remove_small_objects(
-          label_data.astype('bool'), 
-          min_size=min_sieve_size,
-          connectivity=1
-        ).astype('uint8')
-    label_data_skimage = label(label_data)
-    
-#     test_path = f'./temp/{region}_{id}.tif'
+        label_data = np.where((lake_mask == 1), full_wtr_mask, 0).astype('uint8')
+        label_data = ski.morphology.remove_small_objects(
+                label_data.astype('bool'), 
+                min_size=min_sieve_size,
+                connectivity=1
+                ).astype('uint8')
+        label_data_skimage = label(label_data)
 
-#     out_meta = {
-#         'driver': 'GTiff',
-#         'height': label_data.shape[0],
-#         'width': label_data.shape[1],
-#         'count': 1,
-#         'dtype': 'uint8', 
-#         'dtype': label_data.dtype,
-#         'crs': change_crs,
-#         'transform': window_transform
-#     }
+        #     test_path = f'./temp/{region}_{id}.tif'
 
-#     with rio.open(test_path, 'w', **out_meta) as dest:
-#         dest.write(label_data, 1)
+        #     out_meta = {
+        #         'driver': 'GTiff',
+        #         'height': label_data.shape[0],
+        #         'width': label_data.shape[1],
+        #         'count': 1,
+        #         'dtype': 'uint8', 
+        #         'dtype': label_data.dtype,
+        #         'crs': change_crs,
+        #         'transform': window_transform
+        #     }
 
-    return label_data_skimage, change_data, dataset, region, lake_id 
+        #     with rio.open(test_path, 'w', **out_meta) as dest:
+        #         dest.write(label_data, 1)
+
+        return label_data_skimage, change_data,  region, lake_id
+
 
 def make_props_table_largest_area(label_data, change_data):
         """
@@ -268,32 +279,8 @@ def make_props_table_largest_area(label_data, change_data):
                 pandas.Series: A Series containing properties of the largest region by area.
         """
 
-        def count_wtr_pix(region, intensity_data): 
-                cnt = np.sum(intensity_data[region] == 1)
-                return cnt
-
-        def count_increase_pix(region, intensity_data):
-                cnt = np.sum(intensity_data[region] == 2)
-                return cnt
-
-        def count_decrease_pix(region, intensity_data):
-                cnt = np.sum(intensity_data[region] == 3)
-                return cnt
-
-        props_tbl = regionprops_table(
-                label_data,
-                change_data,
-                properties=('area', 'label'),
-                extra_properties=(
-                        count_wtr_pix,
-                        count_increase_pix,
-                        count_decrease_pix,
-                )
-        )
-        
-        df = pd.DataFrame(props_tbl)
-        if df.empty:
-                print('Empty DataFrame')
+        if label_data is None or change_data is None:
+                print('No data')
                 dummy_series = pd.Series({
                         'area': np.nan,
                         'label': np.nan,
@@ -302,22 +289,61 @@ def make_props_table_largest_area(label_data, change_data):
                         'count_decrease_pix': np.nan
                 })
                 return dummy_series
+        
+        else:
 
-        largest_area = df.sort_values(by='area', ascending=False).iloc[0]
+                def count_wtr_pix(region, intensity_data): 
+                        cnt = np.sum(intensity_data[region] == 1)
+                        return cnt
 
-        return largest_area
+                def count_increase_pix(region, intensity_data):
+                        cnt = np.sum(intensity_data[region] == 2)
+                        return cnt
+
+                def count_decrease_pix(region, intensity_data):
+                        cnt = np.sum(intensity_data[region] == 3)
+                        return cnt
+
+                props_tbl = regionprops_table(
+                        label_data,
+                        change_data,
+                        properties=('area', 'label'),
+                        extra_properties=(
+                                count_wtr_pix,
+                                count_increase_pix,
+                                count_decrease_pix,
+                        )
+                )
+                
+                df = pd.DataFrame(props_tbl)
+                if df.empty:
+                        print('Empty DataFrame')
+                        dummy_series = pd.Series({
+                                'area': np.nan,
+                                'label': np.nan,
+                                'count_wtr_pix': np.nan,
+                                'count_increase_pix': np.nan,
+                                'count_decrease_pix': np.nan
+                        })
+                        return dummy_series
+
+                largest_area = df.sort_values(by='area', ascending=False).iloc[0]
+
+                return largest_area
 
 # %% 4.3 Generate the optical seasonality table
 
 data = []
+datasets = ['gswo', 'sentinel2', 'glad']
 
-for i in regression_lakes_paths:
-      label_data, change_data, dataset, region, lake_id = read_data_and_masks(i)
-      lake_data = make_props_table_largest_area(label_data, change_data)
-      lake_data['dataset'] = dataset
-      lake_data['region'] = region
-      lake_data['lake_id'] = lake_id
-      data.append(lake_data)
+for d in datasets:
+        for i in regression_lakes_paths:
+                label_data, change_data, region, lake_id = read_data_and_masks(i, d)
+                lake_data = make_props_table_largest_area(label_data, change_data)
+                lake_data['dataset'] = d
+                lake_data['region'] = region
+                lake_data['lake_id'] = lake_id
+                data.append(lake_data)
 
 # %% 4.4 Calculate % seasonal change from pixel counts
 
