@@ -608,8 +608,6 @@ def interaction_plot_one_scope_with_error(df, x_var, y_var, scope, threshold_low
 
 
 
-
-
 # %% Plot seasonal change for both scopes ('all_pld' and 'matched_is2')
 
 df_analyze = seasonal_results.droplevel(level=1, axis=1)

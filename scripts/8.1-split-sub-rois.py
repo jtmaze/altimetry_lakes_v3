@@ -3,6 +3,7 @@
 import glob 
 import os
 import re
+import pprint as pp
 import pandas as pd
 import rasterio as rio
 import rasterio.mask
@@ -14,6 +15,8 @@ sub_roi_names = ['MRD', 'TUK', 'Anderson']
 sub_roi_paths = [f'./data/ew_rois/{n}_roi_shape.shp' for n in sub_roi_names]
 sub_rois = [gpd.read_file(p) for p in sub_roi_paths]
 sub_rois_dict = dict(zip(sub_roi_names, sub_rois))
+
+pp.pp(sub_rois_dict)
 
 # %% Split the IceSat-2 timeseries and the IceSat-2 lakes by sub roi
 
@@ -53,6 +56,7 @@ recurrence_files = glob.glob(f'./data/recurrence_clean/*')
 sub_roi_pattern = r'Recurrence_MRD_TUK_Anderson_(.*)_dataset_sentinel2.tif'
 
 sub_roi_files = extract_unique(recurrence_files, sub_roi_pattern)
+pp.pp(sub_roi_files)
 
 for f in sub_roi_files:
     for name, gdf in sub_rois_dict.items():
@@ -85,6 +89,7 @@ for f in sub_roi_files:
 rasterized_lake_files = glob.glob(f'./data/lake_summaries/*')
 sub_roi_pattern = r'.*_MRD_TUK_Anderson_rasterized_buffers.tif'
 sub_roi_files = extract_unique(rasterized_lake_files, sub_roi_pattern)
+
 
 for f in sub_roi_files:
     for name, gdf in sub_rois_dict.items():

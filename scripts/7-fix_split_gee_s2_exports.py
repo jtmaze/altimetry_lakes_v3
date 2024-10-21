@@ -38,6 +38,8 @@ rois = extract_unique(full_file_list, rois_pattern)
 year_intervals = extract_unique(full_file_list, years_pattern)
 week_intervals = extract_unique(full_file_list, weeks_pattern)
 
+print(rois, year_intervals, week_intervals)
+
 # %% 2.0 Reformat the sentinel-2 occurrences
 """
 The sentinel-2 masks are split into multiple files. We need to merge them into a single file.

@@ -20,27 +20,29 @@ os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
 
 """
 We need two sepperate rasters for matched lakes because GSWO and Sentinel-2 have different
-resolutions. Need to run this script multiple times, changing the dataset (gswo or sentinel2)
+resolutions. Need to run this script multiple times, changing the dataset (landsat or sentinel2)
 or the scope (all_pld or matched_is2).
+
+Because GSWO and GLAD have the same resolution, we can use the same rasterized lakes for both.
 """
-dataset = 'landsat'
-scope = 'matched_is2'
+dataset = 'sentinel2'
+scope = 'all_pld'
 
 """This code for matched ICESat-2 lakes"""
-lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
-lakes = gpd.read_file(lakes_path)
-rois_list = lakes['roi_name'].unique().tolist()
-rois_remove = ['MRD', 'TUK', 'anderson_plain']
-rois_list = [roi for roi in rois_list if roi not in rois_remove]
-
-"""This code for all the clipped PLD lakes"""
-# lakes_path = './data/pld_clipped/*.shp'
-# pld_files = glob.glob(lakes_path)
-# pld_gdfs = [gpd.read_file(file) for file in pld_files]
-# lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
+# lakes_path = './data/lake_summaries/matched_lakes_clean.shp'
+# lakes = gpd.read_file(lakes_path)
 # rois_list = lakes['roi_name'].unique().tolist()
 # rois_remove = ['MRD', 'TUK', 'anderson_plain']
 # rois_list = [roi for roi in rois_list if roi not in rois_remove]
+
+"""This code for all the clipped PLD lakes"""
+lakes_path = './data/pld_clipped/*.shp'
+pld_files = glob.glob(lakes_path)
+pld_gdfs = [gpd.read_file(file) for file in pld_files]
+lakes = gpd.GeoDataFrame(pd.concat(pld_gdfs, ignore_index=True))
+rois_list = lakes['roi_name'].unique().tolist()
+rois_remove = ['MRD', 'TUK', 'anderson_plain']
+rois_list = [roi for roi in rois_list if roi not in rois_remove]
 
 # %% 2.0 Choose buffer values to apply to lakes.
 
@@ -58,6 +60,8 @@ buffer_ref = pd.DataFrame(list(buffer_ref.items()), columns=['band', 'buffer'])
 def read_recurrence_raster(roi_name, dataset):
     """
     Read the first matching recurrence raster file based on ROI name and dataset.
+    inputs: 1) roi_name to select recurrence raster 2) dataset to specify pixel resolution (landsat or sentinel2)
+    outputs: metadata for the recurrence raster
     """
     if dataset == 'landsat':
         ds = 'gswo'
@@ -75,6 +79,8 @@ def read_recurrence_raster(roi_name, dataset):
 def read_matched_lake_shapes(roi_name, lakes_clean_gdf):
     """
     Filter lakes by ROI name and convert geometries to estimated UTM CRS.
+    inputs: 1) roi_name to filter lakes 2) GeoDataFrame of all cleaned lakes
+    outputs: GeoDataFrame of lakes in UTM CRS
     """
     roi_lakes = lakes_clean_gdf[lakes_clean_gdf['roi_name'] == roi_name]
     est_crs = roi_lakes.estimate_utm_crs(datum_name='WGS 84')
@@ -84,6 +90,8 @@ def read_matched_lake_shapes(roi_name, lakes_clean_gdf):
 def buffer_and_rasterize_lakes(roi_lakes_utm, buffer_val, src_meta):
     """
     Buffer lake geometries and rasterize them according to source raster metadata.
+    inputs: 1) GeoDataFrame of lakes in UTM CRS 2) buffer value in meters 3) source raster metadata
+    outputs: rasterized lake geometries
     """
     roi_buffered = roi_lakes_utm.copy()
     buff_col = f'geom_buff{buffer_val}'
@@ -105,7 +113,7 @@ def buffer_and_rasterize_lakes(roi_lakes_utm, buffer_val, src_meta):
 
 def write_output(dataset, roi_name, buffered_layers, src_meta, scope):
     """
-    Write rasterized layers to a GeoTIFF file.
+    Writes the buffered layers to a GeoTIFF file.
     """
     out_path = f'./data/lake_summaries/{scope}_scope_{dataset}_{roi_name}_rasterized_buffers.tif'
 
@@ -125,7 +133,7 @@ def write_output(dataset, roi_name, buffered_layers, src_meta, scope):
 
     print(f'RASTERIZED OUTPUT META: {dst.meta}')
 
-def rasterize_matched_is2_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals, scope):
+def rasterize_matched_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals, scope):
     """
     Coordinate the rasterization of buffered lake geometries for multiple buffer values.
     """
@@ -149,11 +157,11 @@ def rasterize_matched_is2_lakes(roi_name, dataset, lakes_clean_gdf, buffer_vals,
 # %% 3.2 Run the functions
 
 for roi_name in rois_list:
-    rasterize_matched_is2_lakes(roi_name, 
-                                dataset=dataset, 
-                                buffer_vals=buffer_vals, 
-                                lakes_clean_gdf=lakes,
-                                scope=scope
+    rasterize_matched_lakes(roi_name, 
+                            dataset=dataset, 
+                            buffer_vals=buffer_vals, 
+                            lakes_clean_gdf=lakes,
+                            scope=scope
     )
 
 # %%

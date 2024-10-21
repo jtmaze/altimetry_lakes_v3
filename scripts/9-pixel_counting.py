@@ -55,12 +55,12 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, band, buffer):
     # timeframes are named differently between GSWO and Sentinel-2. 
 
     if not os.path.exists(path_recurrence_raster) or not os.path.exists(path_lakes):
-        print(f"!!! Skipping {roi_name}, {timeframe}, {dataset}, {scope} because "
+        print(f"!!! Skipping {roi_name}, {timeframe}, {dataset}, {satellite}, {scope} because "
               "files are missing.")
         return None
 
     with rio.open(path_lakes) as mask:
-        mask_data = mask.read([band])
+        mask_data = mask.read([band]) # Band should match buffer values
         mask_meta = mask.meta
         #print(mask_meta)
 
@@ -124,7 +124,7 @@ for roi in rois:
                     band = buffer_ref[buffer_ref['buffer'] == buffer_val]['band'].values[0]
                     matched_data = mask_over_matched_lakes(scope, dataset, timeframe, roi, band, buffer_val)
 
-                    if matched_data is not None:
+                    if matched_data is not None: # Some combinations will not exist
                         results.append(create_summary_df(matched_data,
                                                         roi,
                                                         timeframe,
@@ -139,6 +139,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-full_results.to_csv('./data/pixel_counts_not_fuckup2.csv', index=False)
+full_results.to_csv('./data/pixel_counts_Oct21.csv', index=False)
 
 # %%
