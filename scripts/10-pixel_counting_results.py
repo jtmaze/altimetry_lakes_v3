@@ -463,6 +463,151 @@ def side_by_side_bar_one_scope(df, x_var, y_var, scope):
     # Return the series for each dataset
     return unique_xvar, ds_sentinel2, ds_gswo, ds_glad
 
+def interaction_plot_one_scope(df, x_var, y_var, scope):
+    # Filter data by dataset and the specified scope
+    df_sentinel2 = df[(df['scope'] == scope) & (df['dataset'] == 'sentinel2')]
+    ds_sentinel2 = df_sentinel2.groupby(x_var)[y_var].mean()
+    
+    df_gswo = df[(df['scope'] == scope) & (df['dataset'] == 'gswo')]
+    ds_gswo = df_gswo.groupby(x_var)[y_var].mean()
+    
+    df_glad = df[(df['scope'] == scope) & (df['dataset'] == 'glad')]
+    ds_glad = df_glad.groupby(x_var)[y_var].mean()
+    
+    # Prepare for plotting
+    unique_xvar = ds_sentinel2.index.union(ds_gswo.index).union(ds_glad.index)
+    unique_xvar = sorted(unique_xvar)  # Sort the x variables for consistency
+    
+    colors = {
+        'Sentinel2': '#1f77b4',      # Blue
+        'GSWO': '#ff7f0e',           # Orange
+        'GLAD': '#2ca02c'            # Green
+    }
+    
+    markers = {
+        'Sentinel2': 'o',            # Circle marker for Sentinel2
+        'GSWO': 's',                 # Square marker for GSWO
+        'GLAD': '^'                  # Triangle marker for GLAD
+    }
+    
+    fig, ax = plt.subplots(figsize=(14, 6))
+    
+    # Plotting points and lines for each dataset
+    ax.plot(unique_xvar, ds_sentinel2.reindex(unique_xvar).fillna(0).values, 
+            marker=markers['Sentinel2'], 
+            color=colors['Sentinel2'], 
+            label="Sentinel2", 
+            linestyle='None', 
+            markersize=10)
+    
+    ax.plot(unique_xvar, ds_gswo.reindex(unique_xvar).fillna(0).values, 
+            marker=markers['GSWO'], 
+            color=colors['GSWO'], 
+            label="GSWO", 
+            linestyle='None', 
+            markersize=10)
+    
+    ax.plot(unique_xvar, ds_glad.reindex(unique_xvar).fillna(0).values, 
+            marker=markers['GLAD'], 
+            color=colors['GLAD'], 
+            label="GLAD", 
+            linestyle='None', 
+            markersize=10)
+    
+    # Set x-axis labels and legend
+    ax.set_xticks(np.arange(len(unique_xvar)))
+    ax.set_xticklabels(unique_xvar, rotation=0)  # Rotate labels if needed
+    ax.set_xlabel(x_var.capitalize(), fontweight='bold', fontsize=14)
+    ax.set_ylabel(f'{y_var} %', fontweight='bold', fontsize=14)
+    ax.legend()
+    
+    # Display the plot
+    plt.show()
+    
+    # Return the series for each dataset
+    return unique_xvar, ds_sentinel2, ds_gswo, ds_glad
+
+def interaction_plot_one_scope_with_error(df, x_var, y_var, scope, threshold_low, threshold_high):
+    # Filter data by dataset, scope, and threshold range
+    df_sentinel2 = df[(df['scope'] == scope) & 
+                      (df['dataset'] == 'sentinel2') & 
+                      (df['threshold'] >= threshold_low) & (df['threshold'] <= threshold_high)]
+    ds_sentinel2_mean = df_sentinel2.groupby(x_var)[y_var].mean()
+    ds_sentinel2_std = df_sentinel2.groupby(x_var)[y_var].std()
+    
+    df_gswo = df[(df['scope'] == scope) & 
+                 (df['dataset'] == 'gswo') & 
+                 (df['threshold'] >= threshold_low) & (df['threshold'] <= threshold_high)]
+    ds_gswo_mean = df_gswo.groupby(x_var)[y_var].mean()
+    ds_gswo_std = df_gswo.groupby(x_var)[y_var].std()
+    
+    df_glad = df[(df['scope'] == scope) & 
+                 (df['dataset'] == 'glad') & 
+                 (df['threshold'] >= threshold_low) & (df['threshold'] <= threshold_high)]
+    ds_glad_mean = df_glad.groupby(x_var)[y_var].mean()
+    ds_glad_std = df_glad.groupby(x_var)[y_var].std()
+    
+    # Prepare for plotting
+    unique_xvar = ds_sentinel2_mean.index.union(ds_gswo_mean.index).union(ds_glad_mean.index)
+    unique_xvar = sorted(unique_xvar)  # Sort the x variables for consistency
+    
+    colors = {
+        'Sentinel2': '#1f77b4',      # Blue
+        'GSWO': '#ff7f0e',           # Orange
+        'GLAD': '#2ca02c'            # Green
+    }
+    
+    markers = {
+        'Sentinel2': 'o',            # Circle marker for Sentinel2
+        'GSWO': 's',                 # Square marker for GSWO
+        'GLAD': '^'                  # Triangle marker for GLAD
+    }
+    
+    fig, ax = plt.subplots(figsize=(14, 6))
+    
+    # Plotting points with error bars for each dataset
+    ax.errorbar(unique_xvar, ds_sentinel2_mean.reindex(unique_xvar).fillna(0).values, 
+                yerr=ds_sentinel2_std.reindex(unique_xvar).fillna(0).values, 
+                fmt=markers['Sentinel2'], 
+                color=colors['Sentinel2'], 
+                label="Sentinel2", 
+                linestyle='None',   # No line connecting points
+                markersize=10, 
+                capsize=5)           # Error bar cap size
+    
+    ax.errorbar(unique_xvar, ds_gswo_mean.reindex(unique_xvar).fillna(0).values, 
+                yerr=ds_gswo_std.reindex(unique_xvar).fillna(0).values, 
+                fmt=markers['GSWO'], 
+                color=colors['GSWO'], 
+                label="GSWO", 
+                linestyle='None', 
+                markersize=10, 
+                capsize=5)
+    
+    ax.errorbar(unique_xvar, ds_glad_mean.reindex(unique_xvar).fillna(0).values, 
+                yerr=ds_glad_std.reindex(unique_xvar).fillna(0).values, 
+                fmt=markers['GLAD'], 
+                color=colors['GLAD'], 
+                label="GLAD", 
+                linestyle='None', 
+                markersize=10, 
+                capsize=5)
+    
+    # Set x-axis labels and legend
+    ax.set_xticks(np.arange(len(unique_xvar)))
+    ax.set_xticklabels(unique_xvar, rotation=0)  # Rotate labels if needed
+    ax.set_xlabel(x_var.capitalize(), fontweight='bold', fontsize=14)
+    ax.set_ylabel(f'{y_var} %', fontweight='bold', fontsize=14)
+    ax.legend()
+    
+    # Display the plot
+    plt.show()
+    
+    # Return the series for each dataset
+    return unique_xvar, ds_sentinel2_mean, ds_gswo_mean, ds_glad_mean
+
+
+
 
 
 # %% Plot seasonal change for both scopes ('all_pld' and 'matched_is2')
@@ -472,16 +617,25 @@ keep_cols = ['roi_name', 'dataset', 'scope', 'buffer', 'threshold', 'net_total_s
 drop_cols = [col for col in df_analyze.columns if col not in keep_cols]
 
 df_analyze = df_analyze[
-    (df_analyze['buffer'] == 120) & (df_analyze['threshold'] == 80) & (df_analyze['roi_name'] != 'MRD_TUK_Anderson')
+    (df_analyze['buffer'] == 120) & (df_analyze['roi_name'] != 'MRD_TUK_Anderson')
 ]
 
 (returned_items_all_scopes) = side_by_side_bar_two_scopes(
     df_analyze, 'roi_name', 'net_lake_sn_frac'
 )
 
-(returned_items_lake_all_pld) = side_by_side_bar_one_scope(
+(returned_items_lake_all_pld) = interaction_plot_one_scope(
     df_analyze, 'roi_name', 'net_lake_sn_frac', 'all_pld'
 )
+
+(returned_items_lake_all_pld) = interaction_plot_one_scope_with_error(
+    df_analyze, 'roi_name', 'net_lake_sn_frac', 'all_pld', 70, 86
+)
+
+(returned_items_lake_all_pld) = interaction_plot_one_scope_with_error(
+    df_analyze, 'roi_name', 'net_total_sn_frac', 'all_pld', 70, 86
+)
+
 
 (returned_items_total_all_pld) = side_by_side_bar_one_scope(
     df_analyze, 'roi_name', 'net_total_sn_frac', 'all_pld'
