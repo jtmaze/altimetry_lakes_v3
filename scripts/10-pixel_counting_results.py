@@ -787,6 +787,61 @@ plt.title('Comparing seasonal draw-downs between optical datasets and ICESat-2')
 
 # Display the plot
 plt.show()
+# %% Scatter plot probably works better for this comparison
+
+
+from scipy import stats
+
+scatter_df = merged_df.copy()
+sentinel2 = returned_items_all_scopes[5].reset_index()
+sentinel2.columns = ['roi_name', 'seasonality_s2']
+scatter_df = pd.merge(scatter_df, sentinel2, on='roi_name', how='inner')
+
+print(scatter_df)
+
+# Your scatter plot data
+x = merged_df['seasonality_is2']
+y1 = merged_df['seasonality_mean']
+y2 = scatter_df['seasonality_s2']
+
+# Create the scatter plot
+x = scatter_df['seasonality_is2']
+y1 = scatter_df['seasonality_mean']
+y2 = scatter_df['seasonality_s2']
+
+# Create the scatter plot
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Plot the first data series
+ax.scatter(x, y1, label='Optical Datasets Mean', color='grey', edgecolor='black', alpha=0.7, s=100, marker='o')
+
+# Calculate the best-fit line for the first data series
+slope1, intercept1, r_value1, p_value1, std_err1 = stats.linregress(x, y1)
+line1 = slope1 * x + intercept1
+
+# Plot the best-fit line for the first data series
+ax.plot(x, line1, color='red', linestyle='-', label=f'Best Fit Line 1 (R² = {r_value1**2:.2f})')
+
+# Plot the second data series
+ax.scatter(x, y2, label='Sentinel-2 Area Change', color='blue', edgecolor='black', alpha=0.7, s=100, marker='s')
+
+# Calculate the best-fit line for the second data series
+slope2, intercept2, r_value2, p_value2, std_err2 = stats.linregress(x, y2)
+line2 = slope2 * x + intercept2
+
+# Plot the best-fit line for the second data series
+ax.plot(x, line2, color='green', linestyle='--', label=f'Best Fit Line 2 (R² = {r_value2**2:.2f})')
+
+# Add labels and title
+ax.set_xlabel('WSE Change (meters)')
+ax.set_ylabel('Lake Area Change % (June - August)')
+ax.set_title('Comparison of Lake Area Change vs WSE Change')
+ax.legend()
+ax.grid(True)
+
+# Display the plot
+plt.show()
+
 
 # %% Compare the matched Sentinel-2 lakes and ICESat-2
 optical_values_df = returned_items_all_scopes[5].reset_index()
