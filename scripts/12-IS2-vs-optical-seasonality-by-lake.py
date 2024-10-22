@@ -239,14 +239,18 @@ def read_data_and_masks(path, dataset):
                 window_transform = src.window_transform(window)
                 change_crs = src.crs
 
-
-        label_data = np.where((lake_mask == 1), full_wtr_mask, 0).astype('uint8')
-        label_data = ski.morphology.remove_small_objects(
-                label_data.astype('bool'), 
-                min_size=min_sieve_size,
-                connectivity=1
-                ).astype('uint8')
-        label_data_skimage = label(label_data)
+        if lake_mask.shape != full_wtr_mask.shape:
+               print('Shapes do not match')
+               return None, None, None, None
+        
+        else:
+                label_data = np.where((lake_mask == 1), full_wtr_mask, 0).astype('uint8')
+                label_data = ski.morphology.remove_small_objects(
+                        label_data.astype('bool'), 
+                        min_size=min_sieve_size,
+                        connectivity=1
+                        ).astype('uint8')
+                label_data_skimage = label(label_data)
 
         #     test_path = f'./temp/{region}_{id}.tif'
 
@@ -467,8 +471,8 @@ for dataset in datasets:
             label=f'{dataset} Trendline'
         )
 
-ax.set_xlabel('Seasonal Change ICESat-2 WSE (meters)', fontsize=12)
-ax.set_ylabel('Net Seasonal Area Change %', fontsize=12)
+ax.set_xlabel('Lake WSE Change (meters)', fontsize=12)
+ax.set_ylabel('Lake Area Change (%)', fontsize=12)
 ax.set_title('Seasonality Comparison by Lake', fontsize=14)
 ax.legend(title='Dataset and Trendlines')
 ax.grid(True, linestyle='--', alpha=0.5)
@@ -521,8 +525,8 @@ for ax, region in zip(axes.flat, regions):
     # Customize the subplot
     ax.set_title(region)
     ax.grid(True, linestyle='--', alpha=0.5)
-    ax.set_xlabel('Seasonal Change ICESat-2 WSE (meters)', fontsize=10)
-    ax.set_ylabel('Net Seasonal Area %', fontsize=10)
+    ax.set_xlabel('Lake WSE Change (meters)', fontsize=10)
+    ax.set_ylabel('Lake Area Change (%)', fontsize=10)
 
 # Add a global legend
 handles, labels = ax.get_legend_handles_labels()
@@ -531,10 +535,6 @@ fig.legend(handles, labels, title='Dataset', loc='upper center', bbox_to_anchor=
 # Adjust layout
 plt.tight_layout()
 plt.show()
-
-# %%
-
-# %%
 
 # %%
 
