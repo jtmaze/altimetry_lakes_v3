@@ -40,80 +40,80 @@ for name, gdf in sub_rois_dict.items():
     clipped_timeseries.to_csv(f'./data/lake_timeseries/{name}_timeseries.csv', index=False)
     print(f'{name} lake shapes and timeseries clipped')
 
-# %% Function to search file paths with regex pattern
+# # %% Function to search file paths with regex pattern
 
-def extract_unique(files, pattern):
-    unique_items = set()
-    for file in files:
-        match = re.search(pattern, file)
-        if match:
-            unique_items.add(file)
-    return list(unique_items)
+# def extract_unique(files, pattern):
+#     unique_items = set()
+#     for file in files:
+#         match = re.search(pattern, file)
+#         if match:
+#             unique_items.add(file)
+#     return list(unique_items)
 
-# %% Split the Sentinel2 recurrence files for the sub-roi
+# # %% Split the Sentinel2 recurrence files for the sub-roi
 
-recurrence_files = glob.glob(f'./data/recurrence_clean/*')
-sub_roi_pattern = r'Recurrence_MRD_TUK_Anderson_(.*)_dataset_sentinel2.tif'
+# recurrence_files = glob.glob(f'./data/recurrence_clean/*')
+# sub_roi_pattern = r'Recurrence_MRD_TUK_Anderson_(.*)_dataset_sentinel2.tif'
 
-sub_roi_files = extract_unique(recurrence_files, sub_roi_pattern)
-pp.pp(sub_roi_files)
+# sub_roi_files = extract_unique(recurrence_files, sub_roi_pattern)
+# pp.pp(sub_roi_files)
 
-for f in sub_roi_files:
-    for name, gdf in sub_rois_dict.items():
-        geom = [gdf.iloc[0].geometry]
+# for f in sub_roi_files:
+#     for name, gdf in sub_rois_dict.items():
+#         geom = [gdf.iloc[0].geometry]
 
-        with rio.open(f) as src:
+#         with rio.open(f) as src:
 
-            out_img, out_trans = rio.mask.mask(src, geom, crop=True)
-            out_meta = src.meta.copy()
-            out_meta.update({
-                'driver':'Gtiff',
-                'height': out_img.shape[1],
-                'width': out_img.shape[2],
-                'transform': out_trans
-            })
-            #print(out_meta)
+#             out_img, out_trans = rio.mask.mask(src, geom, crop=True)
+#             out_meta = src.meta.copy()
+#             out_meta.update({
+#                 'driver':'Gtiff',
+#                 'height': out_img.shape[1],
+#                 'width': out_img.shape[2],
+#                 'transform': out_trans
+#             })
+#             #print(out_meta)
 
-        roi_pattern = r'Recurrence_(.*)_timeframe'
-        out_path = re.sub(r'(Recurrence_)(.*?)(_timeframe)',rf'\1{name}\3' , f)
-        print(f)
-        print('---------')
-        print(out_path)
+#         roi_pattern = r'Recurrence_(.*)_timeframe'
+#         out_path = re.sub(r'(Recurrence_)(.*?)(_timeframe)',rf'\1{name}\3' , f)
+#         print(f)
+#         print('---------')
+#         print(out_path)
 
-        with rio.open(out_path, 'w', **out_meta) as dst:
-            dst.write(out_img)
-
-
-# %% Split the rasterized lake files for the sub rois
-
-rasterized_lake_files = glob.glob(f'./data/lake_summaries/*')
-sub_roi_pattern = r'.*_MRD_TUK_Anderson_rasterized_buffers.tif'
-sub_roi_files = extract_unique(rasterized_lake_files, sub_roi_pattern)
+#         with rio.open(out_path, 'w', **out_meta) as dst:
+#             dst.write(out_img)
 
 
-for f in sub_roi_files:
-    for name, gdf in sub_rois_dict.items():
-        geom = [gdf.iloc[0].geometry]
+# # %% Split the rasterized lake files for the sub rois
 
-        with rio.open(f) as src:
+# rasterized_lake_files = glob.glob(f'./data/lake_summaries/*')
+# sub_roi_pattern = r'.*_MRD_TUK_Anderson_rasterized_buffers.tif'
+# sub_roi_files = extract_unique(rasterized_lake_files, sub_roi_pattern)
 
-            out_img, out_trans = rio.mask.mask(src, geom, crop=True)
-            out_meta = src.meta.copy()
-            out_meta.update({
-                'driver':'Gtiff',
-                'height': out_img.shape[1],
-                'width': out_img.shape[2],
-                'transform': out_trans
-            })
-            #print(out_meta)
 
-        roi_pattern = r'(landsat|sentinel2)_(.*?)(_rasterized_buffers.tif)'
-        out_path = re.sub(roi_pattern, rf'\1_{name}\3', f)
-        print(f)
-        print('---------')
-        print(out_path)
+# for f in sub_roi_files:
+#     for name, gdf in sub_rois_dict.items():
+#         geom = [gdf.iloc[0].geometry]
 
-        with rio.open(out_path, 'w', **out_meta) as dst:
-            dst.write(out_img)
+#         with rio.open(f) as src:
 
-# %%
+#             out_img, out_trans = rio.mask.mask(src, geom, crop=True)
+#             out_meta = src.meta.copy()
+#             out_meta.update({
+#                 'driver':'Gtiff',
+#                 'height': out_img.shape[1],
+#                 'width': out_img.shape[2],
+#                 'transform': out_trans
+#             })
+#             #print(out_meta)
+
+#         roi_pattern = r'(landsat|sentinel2)_(.*?)(_rasterized_buffers.tif)'
+#         out_path = re.sub(roi_pattern, rf'\1_{name}\3', f)
+#         print(f)
+#         print('---------')
+#         print(out_path)
+
+#         with rio.open(out_path, 'w', **out_meta) as dst:
+#             dst.write(out_img)
+
+# # %%

@@ -21,9 +21,9 @@ output_sentinel2_dir = './data/recurrence_clean/'
 
 full_file_list = glob.glob(split_sentinel2_dir + '*')
 
-rois_pattern = r'/*sentinel2_raw/(.*?)_yea.*\.tif'
-years_pattern = r'_years(.*?)_wee.*\.tif'
-weeks_pattern = r'_weeks(.*?)-0000.*\.tif'
+rois_pattern = r'_roi_(.*?)_years.*\.tif'
+timeframe_pattern = r's2(partial|full)_roi.*\.tif'
+months_pattern = r'_weeks(.*?)-0000.*\.tif'
 
 def extract_unique(files, pattern):
     unique_items = set()
@@ -35,10 +35,10 @@ def extract_unique(files, pattern):
 
 
 rois = extract_unique(full_file_list, rois_pattern)
-year_intervals = extract_unique(full_file_list, years_pattern)
-week_intervals = extract_unique(full_file_list, weeks_pattern)
+timeframes = extract_unique(full_file_list, timeframe_pattern)
+months = extract_unique(full_file_list, months_pattern)
 
-print(rois, year_intervals, week_intervals)
+print(rois, months, timeframes)
 
 # %% 2.0 Reformat the sentinel-2 occurrences
 """
@@ -46,27 +46,24 @@ The sentinel-2 masks are split into multiple files. We need to merge them into a
 """
 
 for roi in rois:
-    for week_interval in week_intervals:
-        for year_interval in year_intervals:
+    for timeframe in timeframes:
+        for month in months:
     
                 files = glob.glob(os.path.join(split_sentinel2_dir, 
-                                               f'{roi}_years{year_interval}_weeks{week_interval}*.tif'
+                                               f's2{timeframe}_roi_{roi}_years*_weeks{months}*.tif'
                                                )
                                   )
-                
+        
                 src_files = []
-                
                 for path in files:
                     src = rio.open(path)
                     #print(src.meta)
                     src_files.append(src)
 
                 print(f'merging total = {len(src_files)}')
-        
                 merged, out_transform = merge(src_files)
         
                 out_meta = src_files[0].meta.copy()
-        
                 out_meta.update({
                     "driver": "GTiff",
                     "height": merged.shape[1],
@@ -78,8 +75,12 @@ for roi in rois:
 
                 print(f'OUT META: {out_meta}')
 
+                if month == '22-26':
+                    out_month = 'june'
+                elif month == '31-35':
+                    out_month = 'aug'   
                 out_path = os.path.join(output_sentinel2_dir, 
-                                        f'Recurrence_{roi}_timeframe_years{year_interval}_weeks{week_interval}_dataset_sentinel2.tif'
+                                        f'Recurrence_{roi}_timeframe_{timeframe}_dataset_sentinel2_{out_month}.tif'
                                         )
         
                 with rio.open(out_path, 'w', **out_meta) as dst:

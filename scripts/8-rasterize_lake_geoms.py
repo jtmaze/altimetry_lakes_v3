@@ -47,8 +47,8 @@ rois_list = [roi for roi in rois_list if roi not in rois_remove]
 # %% 2.0 Choose buffer values to apply to lakes.
 
 # Buffer values with corresponding band keys
-buffer_vals = [60, 90, 120] # meters
-keys = [1, 2, 3] # Band values for each buffer
+buffer_vals = [120] # meters
+keys = [1] # Band values for each buffer
 buffer_ref = {key: value for key, value in zip(keys, buffer_vals)}
 buffer_ref = pd.DataFrame(list(buffer_ref.items()), columns=['band', 'buffer']) 
 #buffer_ref.to_csv('./data/buffer_bands.csv', index=False)
