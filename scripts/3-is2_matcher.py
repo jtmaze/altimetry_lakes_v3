@@ -44,7 +44,6 @@ for roi_name in rois:
     # Select a few columns of interest
     lakes_slim = lake_data[['lake_id', 'geometry']]
     
-    
     roi_files_path = glob.glob(f'{path_is2_download}/*_{roi_name}_*.csv')
     
     # Read each year of IS2 data
@@ -56,11 +55,9 @@ for roi_name in rois:
         dataset = pd.read_csv(specific_file_path[0])
         dataset.drop(columns=['Unnamed: 0'], inplace=True)
         years.append(dataset)
-    
         #del(dataset)
         
     roi_is2_data = pd.concat(years)
-    
     #del(years)
 
     is2_gdf = gpd.GeoDataFrame(roi_is2_data, 
@@ -69,24 +66,18 @@ for roi_name in rois:
                                                            ),
                                crs='EPSG:4326'
                                )
-    
     #del(roi_is2_data)
     
-    # Spatial join the IS2 points with matched lakes
+    # Spatial join the IS2 points with matched lakes. 
     is2_matched = gpd.sjoin(is2_gdf, lakes_slim, predicate='within', how='inner')
-    
-    is2_matched[0:10000].to_file(f'./temp/{roi_name}_matched_pts.shp', index=False)
+    # Only write a portion of the points for visualization
+    is2_matched[0:1_000_000].to_file(f'./temp/{roi_name}_matched_pts.shp', index=False)
     
     # Convert to a df for more efficient file storage. 
     is2_matched_df = pd.DataFrame(is2_matched.drop(columns=['geometry', 'index_right']))
     is2_matched_df.to_csv(f'{path_matched_pts}/{roi_name}_matched.csv', index=False)
     print(f'{roi_name} matched')
-    
     #del(roi_name, lake_path, lake_data, lakes_slim, is2_gdf, is2_matched, is2_matched_df)
     
 
-
-# %% 
-
-
-
+# %%

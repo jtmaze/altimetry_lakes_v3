@@ -76,9 +76,9 @@ for roi in rois:
                 print(f'OUT META: {out_meta}')
 
                 if month == '22-26':
-                    out_month = 'june'
+                    out_month = 'early'
                 elif month == '31-35':
-                    out_month = 'aug'   
+                    out_month = 'late'   
                 out_path = os.path.join(output_sentinel2_dir, 
                                         f'Recurrence_{roi}_timeframe_{timeframe}_dataset_sentinel2_{out_month}.tif'
                                         )
@@ -90,4 +90,4 @@ for roi in rois:
                     src.close()
             
 
-# %% ..
+

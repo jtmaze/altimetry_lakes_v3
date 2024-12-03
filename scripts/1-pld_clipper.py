@@ -93,15 +93,3 @@ for roi in rois:
     clipped_lakes.to_file(out_path)
     
     print(f'{roi_name} processed')
-    
-    
-
-
-    
-        
-    
-    
-
-
-
-# %%

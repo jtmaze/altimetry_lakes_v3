@@ -142,15 +142,19 @@ for roi_name in rois_list:
     print(f'{roi_name} summarized. {obs5} of {total} >= 5 obs')
     
     # 3.6 Write the timeseries and rich obs_lakes to csv
-    #matched_lakes.to_csv(f'{matched_lakes_path}/{roi_name}_is2matched.csv')
     obs5_lakes.loc[:, 'roi_name'] = roi_name
     obs5_timeseries.loc[:, 'roi_name'] = roi_name
+
     obs5_lakes_path = f'{lake_summaries_path}/{roi_name}_lakesummary.csv'
     obs5_lakes.to_csv(obs5_lakes_path, index=False)
+
     obs5_timeseries_path = f'{lake_ts_path}/{roi_name}_timeseries.csv'
     obs5_timeseries.to_csv(obs5_timeseries_path, index=False)
     
+    obs5_lakes_path = f'{lake_summaries_path}/{roi_name}_lakesummary.shp'
     temp_gdf = gpd.GeoDataFrame(data=obs5_lakes, geometry=obs5_lakes['geometry'])
+    temp_gdf.drop(columns=['obs_dates_list'], inplace=True)
+    temp_gdf.to_file(obs5_lakes_path, index=False)
     
     obs5_lakes_gdfs.append(temp_gdf)
     
@@ -159,8 +163,10 @@ for roi_name in rois_list:
 
 # %% 4. Save matched/threshold stats
 
+matched_lakes_path = f'{lake_summaries_path}/all_matched_lakes.csv'
+matched_lakes.to_csv(matched_lakes_path, index=False)
+
 all_obs5_lakes = pd.concat(obs5_lakes_gdfs)
-all_obs5_lakes.drop(columns=['obs_dates_list'], inplace=True)
 all_obs5_lakes.to_file(f'{lake_summaries_path}/all_lakes.shp')
 
 def format_if_number(value):

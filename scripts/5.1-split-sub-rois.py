@@ -5,8 +5,6 @@ import os
 import re
 import pprint as pp
 import pandas as pd
-import rasterio as rio
-import rasterio.mask
 import geopandas as gpd
 
 os.chdir('/Users/jmaze/Documents/projects/altimetry_lakes_v3')
@@ -26,7 +24,9 @@ all_timeseries = pd.read_csv('./data/lake_timeseries/MRD_TUK_Anderson_timeseries
 for name, gdf in sub_rois_dict.items():
     clipped_lakes = gpd.clip(all_gdf, gdf)
     clipped_lakes['roi_name'] = name
-    clipped_lakes.to_csv(f'./data/lake_summaries/{name}_lakesummary.csv', index=False)
+    print(name)
+    print(clipped_lakes.head(5))
+    clipped_lakes.to_file(f'./data/lake_summaries/{name}_lakesummary.shp', index=False)
 
     geoms_with_ids = clipped_lakes[['lake_id', 'geometry']]
     clipped_timeseries = pd.merge(
@@ -117,3 +117,5 @@ for name, gdf in sub_rois_dict.items():
 #             dst.write(out_img)
 
 # # %%
+
+# %%

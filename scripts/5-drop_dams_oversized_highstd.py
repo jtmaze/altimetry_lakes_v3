@@ -52,7 +52,7 @@ no_dams = no_dams.drop(columns=['index_right', 'geometry_right']).rename(columns
 # %% 5. Filter on perimeter threshold
 
 perimeter_threshold = 250000 # meters = 250 km
-z_std_threshold = 2 # meters
+z_std_threshold = 1 # meters
 
 print(len(no_dams[no_dams['perim_m'] < perimeter_threshold]))
 print(len(no_dams[no_dams['zstd_all_s'] < z_std_threshold]))
@@ -76,7 +76,7 @@ no_dams_clean.to_file('./data/lake_summaries/matched_lakes_clean.shp')
 cols = no_dams_clean.columns
 drop_cols = cols[cols != 'lake_id']
 clean_ids = no_dams_clean.drop(columns=drop_cols)
-clean_ids.to_csv('./data/clean_ids.csv')
+clean_ids.to_csv('./data/clean_ids.csv', index=False)
 
 
 # %%
