@@ -12,6 +12,7 @@ is2_path = './data/lake_timeseries/*_timeseries.csv'
 is2_files = glob.glob(is2_path)
 is2_dfs = [pd.read_csv(file) for file in is2_files]
 is2_data = pd.concat(is2_dfs)
+is2_data = is2_data[is2_data['roi_name'] != 'MRD_TUK_Anderson']
 
 # %% 2. Calculate ICESat-2 seasonality
 
@@ -30,7 +31,6 @@ is2_lake_seasonality = is2_data_clean.groupby(
     by=['lake_id', 'obs_month']
     ).agg(
         mean_zdif = ('zdif_date', 'mean'),
-        std_zdif = ('zdif_date', 'std'),
         roi = ('roi_name', 'first')
         ).reset_index()
 
@@ -39,4 +39,24 @@ is2_roi_seasonality = is2_lake_seasonality.groupby(
     ).agg(
         mean_zdif = ('mean_zdif', 'mean'),
     ).reset_index()
+
+is2_roi_seasonality = is2_roi_seasonality.pivot_table(
+    index= ['roi'],
+    columns= ['obs_month'],
+    values = ['mean_zdif']
+).reset_index()
+
+is2_roi_seasonality['seasonality'] = is2_roi_seasonality[('mean_zdif', '6')] - is2_roi_seasonality[('mean_zdif', '8')]
+
+drop_cols = [
+    ('mean_zdif', '6'),
+    ('mean_zdif', '8')
+]
+is2_roi_seasonality.drop(
+    columns=drop_cols,
+    inplace=True
+)
+
+# %% Write the file
+is2_roi_seasonality.to_csv('./data/is2_roi_seasonality.csv', index=False)
 

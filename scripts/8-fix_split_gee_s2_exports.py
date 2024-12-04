@@ -50,7 +50,7 @@ for roi in rois:
         for month in months:
     
                 files = glob.glob(os.path.join(split_sentinel2_dir, 
-                                               f's2{timeframe}_roi_{roi}_years*_weeks{months}*.tif'
+                                               f's2{timeframe}_roi_{roi}_years*_weeks{month}*.tif'
                                                )
                                   )
         
@@ -91,3 +91,5 @@ for roi in rois:
             
 
 
+
+# %%

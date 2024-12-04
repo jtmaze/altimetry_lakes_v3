@@ -85,7 +85,7 @@ def mask_over_matched_lakes(scope, dataset, timeframe, roi_name, month, band, bu
     print(matched_data.shape)
 
     # Write select masked rasters to drive
-    if (buffer == 60) and (roi_name in ['MRD', 'TUK', 'YKflats', 'YKF']) and (scope == 'all_pld') and (month == 'late'):
+    if (buffer == 60) and (roi_name in ['MRD', 'TUK', 'YKflats', 'YKF']) and (scope == 'all_pld'):
         
         output_path = f'./data/masked_rasters/roi_{roi_name}_timeframe_{timeframe}_month_{month}_dataset_{dataset}_buffer{buffer}.tif'
         with rio.open(output_path, 'w', 
@@ -135,6 +135,13 @@ scopes = ['all_pld', 'matched_is2']
 
 results = []
 
+rois = ['YKflats', 'YKF', 'MRD', 'TUK']
+buffer_vals = [60]
+scopes = ['all_pld']
+timeframes = ['full']
+months = ['early']
+
+
 for roi in rois:
     for scope in scopes:
         for dataset in datasets:
@@ -162,6 +169,6 @@ for roi in rois:
 
 full_results = pd.concat(results)
 
-full_results.to_csv('./data/pixel_counts.csv', index=False)
+#full_results.to_csv('./data/pixel_count.csv', index=False)
 
 # %%
