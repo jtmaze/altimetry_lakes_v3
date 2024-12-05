@@ -18,37 +18,29 @@ masked_raster_paths = glob.glob('./data/masked_rasters/*.tif')
 def parse_file_names(file_path):
 
     match = re.match(
-        r'.*scope_(.*?)__roi_(.*?)__timeframe_(.*?)__dataset_(.*?)__buffer(\d+)\.tif',
+        r'.*roi_(.*?)_timeframe_(.*?)_month_(.*?)_dataset_(.*?)_buffer(\d+)\.tif',
         file_path
     )
     if match:
-        scope = match.group(1)
-        roi = match.group(2)
-        timeframe = match.group(3)
+        roi = match.group(1)
+        timeframe = match.group(2)
+        month = match.group(3)
         dataset = match.group(4)
         buffer = match.group(5)
 
-        return scope, roi, timeframe, dataset, buffer
+        return roi, timeframe, month, dataset, buffer
 
 
 # Using the defaultdict becuase it automatically initializes keys for appending
 raster_change_dict = defaultdict(list)
 
 for p in masked_raster_paths:
-    scope, roi, timeframe, dataset, buffer = parse_file_names(p)
-    key = (scope, roi, dataset, buffer)
-    # Append the timeframe and file path as a tuple with corresponding key in dictionary
-    raster_change_dict[key].append((timeframe, p))
+    roi, timeframe, month, dataset, buffer = parse_file_names(p)
+    key = (roi, timeframe, dataset, buffer)
+    # Append the month and file path as a tuple with corresponding key in dictionary
+    raster_change_dict[key].append((month, p))
 
 # %% 3.0 Change detection by simply subtracting pixel values. 
-
-def sort_landsat_key(raster):
-    """
-    Sort function for Landsat rasters based on month names.
-    """
-    timeframe, _ = raster
-    timeframe_map = {'june': 6, 'aug': 8}
-    return timeframe_map.get(timeframe, timeframe)
 
 # def simple_raster_subtraction(
 #         src_early, src_late, roi, dataset, scope, timeframe1, 
@@ -74,8 +66,8 @@ def sort_landsat_key(raster):
 #         #return data_early, data_late, img_meta
 
 def simple_raster_subtraction_rxr(
-        src_early_path, src_late_path, roi, dataset, scope, timeframe1,
-        timeframe2, buffer, write_file=False
+        src_early_path, src_late_path, roi, dataset, month1,
+        month2, buffer, timeframe, write_file=False
 ):
 
     if write_file:
@@ -86,14 +78,14 @@ def simple_raster_subtraction_rxr(
         # Write 'no data' value to -110 outside PLD mask
         change_data = change_data.where((data_early != -1) & (data_late != -1), -110)
         change_data.rio.write_nodata(-110, inplace=True)
-        output_path = f'./data/change_maps/RasterChange__{roi}__{dataset}__{scope}__change__{timeframe1}_to_{timeframe2}_buffer{buffer}.tif'
+        output_path = f'./data/change_maps/RasterChange_{roi}_{dataset}_{timeframe}_change_{month1}_to_{month2}_buffer{buffer}.tif'
         print(f'processing {output_path}')
         change_data.rio.to_raster(output_path)
 
 def change_by_water_mask(
         src_early_path, src_late_path, threshold, roi, 
-        dataset, scope, timeframe1, timeframe2, 
-        buffer, write_file=False
+        dataset, month1, month2, 
+        buffer, timeframe, write_file=False
 ):
 
     if write_file:
@@ -119,7 +111,7 @@ def change_by_water_mask(
 
         del lake_mask_early, lake_mask_late, na_mask
 
-        output_path = f'./data/change_maps/MaskChange__{roi}__{dataset}__{scope}__change__{timeframe1}_to_{timeframe2}_buffer{buffer}.tif'
+        output_path = f'./data/change_maps/MaskChange_{roi}_{dataset}_{timeframe}_change_{month1}_to_{month2}_buffer{buffer}.tif'
         print(f'writing file to {output_path}')
         change_classified.rio.to_raster(output_path)
         
@@ -127,22 +119,19 @@ def change_by_water_mask(
 # %% Generate change maps. 
 
 for key, rasters in raster_change_dict.items():
-    scope, roi, dataset, buffer = key
+    roi, timeframe, dataset, buffer = key
 
-    if scope == 'matched_is2':
+    if timeframe == 'partial':
         continue
     else:
     # Sort rasters into proper order before change detection
-        if dataset in ['gswo', 'glad']:        
-            sorted_rasters = sorted(rasters, key=sort_landsat_key)
-        else:   
-            sorted_rasters = sorted(rasters)  # sorted by timeframe
+        sorted_rasters = sorted(rasters)  # alphebetcial works in this case
 
         # We will process the rasters two at a time (pairwise)
         for i in range(len(sorted_rasters) - 1):
             # Get the current raster and the next one for comparison
-            (timeframe1, path1) = sorted_rasters[i]
-            (timeframe2, path2) = sorted_rasters[i + 1]
+            (month1, path1) = sorted_rasters[i]
+            (month2, path2) = sorted_rasters[i + 1]
 
             print(roi)
 
@@ -150,12 +139,12 @@ for key, rasters in raster_change_dict.items():
                 src_early_path=path1,
                 src_late_path=path2, 
                 roi=roi, 
-                dataset=dataset, 
-                scope=scope, 
-                timeframe1=timeframe1, 
-                timeframe2=timeframe2, 
+                dataset=dataset,  
+                month1=month1, 
+                month2=month2, 
                 buffer=buffer, 
-                write_file=True
+                timeframe=timeframe,
+                write_file=False
             )
 
             change_by_water_mask(
@@ -164,10 +153,10 @@ for key, rasters in raster_change_dict.items():
                 threshold=80,
                 roi=roi,
                 dataset=dataset,
-                scope=scope,
-                timeframe1=timeframe1,
-                timeframe2=timeframe2,
+                month1=month1,
+                month2=month2,
                 buffer=buffer,
+                timeframe=timeframe,
                 write_file=True
             )
                             
